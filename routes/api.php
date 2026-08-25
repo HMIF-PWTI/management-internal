@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\HmifPediaController;
 use App\Http\Controllers\Api\IfPediaController;
 use App\Http\Controllers\Api\InfoKpController;
 use App\Http\Controllers\Api\KegiatanController;
@@ -16,6 +17,8 @@ Route::post('/rfid/scan', [RfidScanController::class, 'scan'])
     ->middleware(['rfid.api.key', 'throttle:30,1']);
 Route::get('/lapak-kwu', [LapakKwuController::class, 'index']);
 Route::get('/lapak-kwu/{id}', [LapakKwuController::class, 'show']);
+Route::get('/hmif-pedia', [HmifPediaController::class, 'index']);
+Route::get('/hmif-pedia/pdf', [HmifPediaController::class, 'pdf']);
 
 Route::prefix('v1')->group(function () {
     Route::get('/kegiatans', [KegiatanController::class, 'index']);
