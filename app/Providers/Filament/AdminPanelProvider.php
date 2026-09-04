@@ -22,6 +22,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Widgets\WelcomeDashboardWidget;
 use App\Filament\Widgets\QuickStatsWidget;
 use App\Filament\Widgets\LatestKegiatanWidget;
+use Filament\Navigation\NavigationGroup;
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
@@ -30,12 +31,18 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
             ->registration(Register::class)
             ->favicon(asset('images/logo-hmif.png'))
             ->brandLogo(asset('images/logo-hmif.png'))
             ->brandLogoHeight('4rem')
             ->brandName('HMIF')
+            ->navigationGroups([
+                NavigationGroup::make()
+                    ->label('HMIF Forms')
+                    ->collapsible(),
+            ])
 
             ->colors([
                 'primary' => Color::Amber,

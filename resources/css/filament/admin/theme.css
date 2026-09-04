@@ -1,0 +1,37 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+@source '../../../../resources/views/components/hmif-forms/**/*';
+
+/* Scoped HMIF Forms template gallery. */
+.hmif-template-gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.5rem; }
+.hmif-template-card { display: flex; min-width: 0; flex-direction: column; }
+.hmif-template-canvas-wrap { aspect-ratio: 4 / 3; overflow: hidden; padding: .8rem; border: 1px solid rgb(229 231 235); border-radius: .8rem; background: rgb(243 244 246); box-shadow: 0 1px 2px rgb(0 0 0 / .05); transition: border-color .18s, box-shadow .18s, transform .18s; }
+.hmif-template-card:hover .hmif-template-canvas-wrap { border-color: rgb(var(--primary-400)); box-shadow: 0 10px 24px rgb(0 0 0 / .12); transform: translateY(-2px); }
+.hmif-template-canvas { height: 100%; overflow: hidden; border-top: 6px solid rgb(var(--primary-500)); border-radius: .45rem; background: white; padding: .8rem; box-shadow: 0 2px 8px rgb(0 0 0 / .1); transition: transform .18s; }
+.hmif-template-card:hover .hmif-template-canvas { transform: scale(1.01); }
+.hmif-template-canvas h3 { overflow: hidden; color: rgb(17 24 39); font-size: .76rem; font-weight: 700; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.hmif-template-canvas-description { margin-top: .18rem; overflow: hidden; color: rgb(107 114 128); font-size: .52rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.hmif-template-question { margin-top: .55rem; }
+.hmif-template-question-label { display: block; overflow: hidden; color: rgb(55 65 81); font-size: .56rem; font-weight: 600; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.hmif-template-answer-line { height: .7rem; margin-top: .18rem; border-bottom: 1px solid rgb(209 213 219); color: rgb(156 163 175); font-size: .46rem; }
+.hmif-template-answer-line + .hmif-template-answer-line { margin-top: .08rem; }
+.hmif-template-option { display: flex; align-items: center; gap: .24rem; margin-top: .18rem; color: rgb(75 85 99); font-size: .48rem; line-height: 1; }
+.hmif-template-option-mark { width: .36rem; height: .36rem; flex-shrink: 0; border: 1px solid rgb(156 163 175); }
+.hmif-template-option-mark.radio { border-radius: 999px; }
+.hmif-template-select { display: flex; align-items: center; justify-content: space-between; width: 70%; margin-top: .25rem; padding: .2rem .3rem; border: 1px solid rgb(209 213 219); border-radius: .2rem; color: rgb(107 114 128); font-size: .46rem; }
+.hmif-template-blank { display: flex; height: 100%; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.hmif-template-blank-icon { display: grid; width: 2.6rem; height: 2.6rem; place-items: center; border: 1px dashed rgb(var(--primary-400)); border-radius: .65rem; background: rgb(var(--primary-50)); color: rgb(var(--primary-600)); font-size: 1.55rem; }
+.hmif-template-blank strong { margin-top: .55rem; color: rgb(31 41 55); font-size: .72rem; }
+.hmif-template-footer { display: flex; min-height: 8.25rem; flex: 1; flex-direction: column; padding: 1rem .25rem .25rem; }
+.hmif-template-name { color: rgb(17 24 39); font-size: .95rem; font-weight: 650; }
+.hmif-template-description { flex: 1; margin-top: .25rem; color: rgb(107 114 128); font-size: .8rem; line-height: 1.4; }
+.hmif-template-action { display: flex; justify-content: flex-start; margin-top: .75rem; }
+.dark .hmif-template-canvas-wrap { border-color: rgb(255 255 255 / .12); background: rgb(3 7 18); }
+.dark .hmif-template-card:hover .hmif-template-canvas-wrap { border-color: rgb(var(--primary-500) / .7); box-shadow: 0 10px 24px rgb(0 0 0 / .35); }
+.dark .hmif-template-name { color: white; }
+.dark .hmif-template-description { color: rgb(156 163 175); }
+@media (max-width: 1535px) { .hmif-template-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1023px) { .hmif-template-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 639px) { .hmif-template-gallery { grid-template-columns: 1fr; max-width: 34rem; } }
