@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\ActivateAccountController;
+use App\Http\Controllers\QrCodeController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HmifForms\FormController;
 use App\Http\Controllers\HmifForms\PublicFormController;
@@ -35,6 +36,12 @@ Route::middleware('auth')->prefix('admin/hmif-forms')->name('hmif-forms.actions.
     Route::post('/{form}/duplicate', [FormController::class, 'duplicate'])->name('duplicate');
     Route::delete('/{form}', [FormController::class, 'destroy'])->name('destroy');
 });
+
+Route::middleware('auth')->post('/admin/qr-code-generator', [QrCodeController::class, 'store'])
+    ->name('qr-code-generator.store');
+
+Route::get('/qr/{qrCode}', [QrCodeController::class, 'track'])
+    ->name('qr.scan');
 
 Route::middleware('auth')->prefix('forms')->group(function () {
     Route::get('/', fn () => redirect(FormsDashboard::getUrl()));
