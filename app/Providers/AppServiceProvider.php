@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\Kegiatan;
 use App\Observers\KegiatanObserver;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL;
 use Kreait\Firebase\Contract\Database;
 use Kreait\Firebase\Factory;
 use RuntimeException;
@@ -42,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
+
         Kegiatan::observe(KegiatanObserver::class);
     }
 
