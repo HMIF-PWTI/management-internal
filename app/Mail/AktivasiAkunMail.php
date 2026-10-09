@@ -10,7 +10,7 @@ use Illuminate\Queue\SerializesModels;
 
 class AktivasiAkunMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, \App\Mail\Concerns\EmbedsHmifLogo;
 
     public User $user;
     public string $activationUrl;
@@ -28,7 +28,8 @@ class AktivasiAkunMail extends Mailable
 
     public function build()
     {
-        return $this->subject('Aktivasi Akun Internal HMIF')
+        return $this->embedHmifLogo()
+            ->subject('Aktivasi Akun Internal HMIF')
             ->markdown('emails.aktivasi-akun');
     }
 }
