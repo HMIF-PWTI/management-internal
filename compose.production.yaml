@@ -1,0 +1,38 @@
+services:
+  app:
+    ports: !reset []
+    environment:
+      APP_URL: ${APP_URL:?Set APP_URL in .env}
+      DB_CONNECTION: mysql
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-hmif_internal}
+      DB_USERNAME: ${DB_USERNAME:-hmif}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+
+  database:
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-hmif_internal}
+      MYSQL_USER: ${DB_USERNAME:-hmif}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD}"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  caddy-data:
+  caddy-config:

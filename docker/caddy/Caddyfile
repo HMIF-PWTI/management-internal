@@ -1,0 +1,4 @@
+management.hmifunikom.my.id {
+	encode zstd gzip
+	reverse_proxy app:80
+}

@@ -205,6 +205,38 @@ Untuk menghentikan container tanpa menghapus database atau file unggahan:
 docker compose down
 ```
 
+### Deployment production dengan Caddy
+
+Deployment production menggunakan `compose.production.yaml`. Container Caddy
+menerima trafik pada port 80/443, membuat dan memperbarui sertifikat HTTPS
+secara otomatis, lalu meneruskan request ke container `app`. Port aplikasi
+tidak dipublikasikan langsung ke host.
+
+Pastikan DNS `management.hmifunikom.my.id` sudah mengarah ke server dan `.env`
+berisi nilai production berikut:
+
+```dotenv
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://management.hmifunikom.my.id
+DB_DATABASE=hmif_internal
+DB_USERNAME=hmif
+DB_PASSWORD=<password-acak>
+MYSQL_ROOT_PASSWORD=<password-root-acak>
+```
+
+Validasi dan jalankan seluruh stack:
+
+```bash
+docker compose -f compose.yaml -f compose.production.yaml config --quiet
+docker compose -f compose.yaml -f compose.production.yaml up --build -d
+docker compose -f compose.yaml -f compose.production.yaml ps
+docker compose -f compose.yaml -f compose.production.yaml logs --tail 100 caddy
+```
+
+Jangan gunakan `docker compose down -v` pada server production karena opsi
+`-v` menghapus volume database, unggahan, dan data sertifikat Caddy.
+
 ## Cara Install Project
 
 ### 1. Clone Repository
