@@ -177,6 +177,34 @@ Fitur yang tersedia:
 
 ---
 
+## Menjalankan dengan Docker
+
+Pastikan file `.env` sudah ada dan `APP_KEY` sudah terisi, lalu jalankan:
+
+```powershell
+docker compose up --build -d
+```
+
+Aplikasi tersedia di `http://localhost:8000`. Saat container aplikasi dimulai,
+migrasi database dijalankan otomatis. MySQL dan folder `storage` disimpan di
+Docker volume sehingga data tetap ada ketika container dibuat ulang.
+
+Batas unggah di dalam container adalah 100 MB (`upload_max_filesize=100M`),
+dengan `post_max_size=110M` untuk memberi ruang pada data request lainnya.
+Validasi Filament dan Livewire juga menggunakan batas 102400 KB (100 MB).
+
+Periksa konfigurasi yang sedang aktif dengan:
+
+```powershell
+docker compose exec app php -r "echo ini_get('upload_max_filesize'), PHP_EOL, ini_get('post_max_size'), PHP_EOL;"
+```
+
+Untuk menghentikan container tanpa menghapus database atau file unggahan:
+
+```powershell
+docker compose down
+```
+
 ## Cara Install Project
 
 ### 1. Clone Repository

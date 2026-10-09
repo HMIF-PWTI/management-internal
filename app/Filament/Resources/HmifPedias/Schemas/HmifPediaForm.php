@@ -24,7 +24,7 @@ class HmifPediaForm
                 ->disk('public')
                 ->directory('hmif-pedia')
                 ->visibility('public')
-                ->maxSize(20480)
+                ->maxSize(102400) // 100 MB
                 ->required(),
             Toggle::make('is_active')
                 ->label('Aktif')

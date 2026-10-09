@@ -1,0 +1,44 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    env_file:
+      - .env
+    environment:
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_DATABASE: hmif_internal
+      DB_USERNAME: hmif
+      DB_PASSWORD: hmif_local_password
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - app-storage:/var/www/html/storage
+    command: ["sh", "-c", "chown -R www-data:www-data storage bootstrap/cache && chmod -R ug+rwX storage bootstrap/cache && php artisan migrate --force && php artisan storage:link --force && apache2-foreground"]
+
+  database:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: hmif_internal
+      MYSQL_USER: hmif
+      MYSQL_PASSWORD: hmif_local_password
+      MYSQL_ROOT_PASSWORD: hmif_local_root_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-phmif_local_root_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  app-storage:
+  mysql-data:

@@ -24,7 +24,7 @@ class IfPediaForm
                     ->disk('public')
                     ->directory('if-pedia')
                     ->visibility('public')
-                    ->maxSize(20480) // 20 MB
+                    ->maxSize(102400) // 100 MB
                     ->required(),
                 Toggle::make('is_active')
                     ->default(true),
