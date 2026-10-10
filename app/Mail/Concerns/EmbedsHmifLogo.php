@@ -2,7 +2,9 @@
 
 namespace App\Mail\Concerns;
 
+use RuntimeException;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Part\DataPart;
 
 trait EmbedsHmifLogo
 {
@@ -13,11 +15,21 @@ trait EmbedsHmifLogo
     protected function embedHmifLogo(): static
     {
         return $this->withSymfonyMessage(function (Email $message) {
-            $message->embedFromPath(
-                public_path('images/logo-hmif.png'),
-                'logo-hmif',
-                'image/png'
-            );
+            $logoContents = file_get_contents(public_path('images/logo-hmif.png'));
+
+            if ($logoContents === false) {
+                throw new RuntimeException('Logo HMIF tidak dapat dibaca.');
+            }
+
+            $logo = (new DataPart(
+                $logoContents,
+                'logo-hmif.png',
+                'image/png',
+            ))
+                ->asInline()
+                ->setContentId('logo-hmif@hmifunikom.my.id');
+
+            $message->addPart($logo);
         });
     }
 }

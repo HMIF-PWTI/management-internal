@@ -19,11 +19,14 @@ class AktivasiAkunMail extends Mailable
     {
         $this->user = $user;
 
-        $this->activationUrl = URL::temporarySignedRoute(
+        $signedPath = URL::temporarySignedRoute(
             'akun.aktivasi',
             now()->addHours(24),
-            ['user' => $user->id]
+            ['user' => $user->getKey()],
+            absolute: false,
         );
+
+        $this->activationUrl = rtrim((string) config('app.url'), '/').$signedPath;
     }
 
     public function build()
