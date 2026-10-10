@@ -1,6 +1,8 @@
 services:
   app:
     ports: !reset []
+    secrets:
+      - firebase_credentials
     environment:
       APP_URL: ${APP_URL:?Set APP_URL in .env}
       SESSION_SECURE_COOKIE: "true"
@@ -10,6 +12,7 @@ services:
       DB_DATABASE: ${DB_DATABASE:-hmif_internal}
       DB_USERNAME: ${DB_USERNAME:-hmif}
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      FIREBASE_CREDENTIALS: /run/secrets/firebase_credentials
 
   database:
     environment:
@@ -37,3 +40,7 @@ services:
 volumes:
   caddy-data:
   caddy-config:
+
+secrets:
+  firebase_credentials:
+    file: ${FIREBASE_CREDENTIALS_HOST_PATH:-./storage/app/firebase/firebase-service-account.json}

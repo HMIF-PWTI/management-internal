@@ -12,6 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
      ->withMiddleware(function (Middleware $middleware) {
+        // Production traffic reaches Laravel through the Caddy container.
+        // Trust the direct proxy so signed URLs are validated using the
+        // original HTTPS scheme and host from the forwarded headers.
+        $middleware->trustProxies(at: '*');
+
         $middleware->redirectGuestsTo('/admin/login');
         $middleware->alias([
             'rfid.api.key' => RfidApiKeyMiddleware::class,
