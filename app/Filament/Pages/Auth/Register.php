@@ -34,7 +34,9 @@ class Register extends BaseRegister
                     ->required(),
 
                 TextInput::make('email')
-                    ->label('Email Unikom')
+                    ->label('Email Aktif')
+                    ->placeholder('contoh: nama@gmail.com')
+                    ->helperText('Gunakan email yang aktif untuk menerima link aktivasi akun.')
                     ->email()
                     ->required(),
 
