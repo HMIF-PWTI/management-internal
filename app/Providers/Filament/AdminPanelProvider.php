@@ -34,8 +34,8 @@ class AdminPanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
             ->registration(Register::class)
-            ->favicon(asset('images/logo-hmif.png'))
-            ->brandLogo(asset('images/logo-hmif.png'))
+            ->favicon('/images/logo-hmif.png')
+            ->brandLogo('/images/logo-hmif.png')
             ->brandLogoHeight('4rem')
             ->brandName('HMIF')
             ->navigationGroups([
