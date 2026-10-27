@@ -20,6 +20,8 @@ class QrCodeResource extends Resource
 {
     protected static ?string $model = QrCode::class;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQrCode;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Tools';
@@ -27,6 +29,12 @@ class QrCodeResource extends Resource
     protected static ?string $navigationLabel = 'QR Codes';
 
     protected static ?int $navigationSort = 19;
+
+    public static function canAccess(): bool
+    {
+        // Disembunyikan sementara sampai ditentukan divisi mana yang boleh mengakses
+        return false;
+    }
 
     public static function form(Schema $schema): Schema
     {

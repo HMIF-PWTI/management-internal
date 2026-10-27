@@ -11,6 +11,8 @@ class QrCodeGenerator extends Page
 {
     protected static ?string $navigationLabel = 'QR Code Generator';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedQrCode;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Tools';
@@ -25,7 +27,8 @@ class QrCodeGenerator extends Page
 
     public static function canAccess(): bool
     {
-        return Auth::check();
+        // Disembunyikan sementara sampai ditentukan divisi mana yang boleh mengakses
+        return false;
     }
 
     public function getViewData(): array
