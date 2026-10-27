@@ -15,9 +15,10 @@ class DatabaseSeeder extends Seeder
      */
 public function run(): void
 {
-    $this->call([
-        DivisiSeeder::class,
+        $this->call([
+            DivisiSeeder::class,
             SuperAdminSeeder::class,
-    ]);
+            RfidCardSeeder::class,
+        ]);
 }
 }

@@ -65,7 +65,7 @@ class RfidScanController extends Controller
                 'uid' => $uid,
                 'nim' => $rfidCard->nim,
                 'nama' => $rfidCard->nama,
-                'divisi' => $rfidCard->divisi,
+                'divisi' => $rfidCard->divisi?->singkatan ?? $rfidCard->divisi?->nama ?? $rfidCard->jabatan ?? '-',
             ], 403);
         }
 
@@ -158,7 +158,7 @@ class RfidScanController extends Controller
             'email' => $user?->email,
             'email_sent' => $emailSent,
             'email_status' => $emailStatus,
-            'divisi' => $user?->divisi?->singkatan ?? $rfidCard->divisi,
+            'divisi' => $user?->divisi?->singkatan ?? $rfidCard->divisi?->singkatan ?? $rfidCard->divisi?->nama ?? $rfidCard->jabatan ?? '-',
             'kegiatan' => $kegiatan?->nama,
             'tanggal' => $absensi->tanggal,
             'jam_masuk' => $absensi->jam_masuk,
