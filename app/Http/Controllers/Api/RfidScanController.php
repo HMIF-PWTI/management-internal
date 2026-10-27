@@ -130,22 +130,23 @@ class RfidScanController extends Controller
                 'user_id' => $user->id,
             ]);
         } else {
-            try {
-                Mail::to($user->email)->send(
-                    new AbsensiNotificationMail($absensi, $mailSubject)
-                );
+            // Kirim email di background setelah response HTTP selesai dikirim ke ESP8266
+            app()->terminating(function () use ($user, $absensi, $mailSubject) {
+                try {
+                    Mail::to($user->email)->send(
+                        new AbsensiNotificationMail($absensi, $mailSubject)
+                    );
+                } catch (Throwable $exception) {
+                    Log::error('Email absensi gagal dikirim', [
+                        'absensi_id' => $absensi->id,
+                        'user_id' => $user->id,
+                        'exception' => $exception,
+                    ]);
+                }
+            });
 
-                $emailSent = true;
-                $emailStatus = 'sent';
-            } catch (Throwable $exception) {
-                $emailStatus = 'smtp_failed';
-
-                Log::error('Email absensi gagal dikirim', [
-                    'absensi_id' => $absensi->id,
-                    'user_id' => $user->id,
-                    'exception' => $exception,
-                ]);
-            }
+            $emailSent = true;
+            $emailStatus = 'sent_after_response';
         }
 
         return response()->json([
