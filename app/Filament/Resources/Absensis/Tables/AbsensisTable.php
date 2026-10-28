@@ -29,13 +29,12 @@ class AbsensisTable
                 $isSuperAdmin = strtolower(trim($userLogin?->divisi?->singkatan ?? '')) === 'superadmin';
 
                 if (! $isSuperAdmin) {
-                    if ($userLogin && ! empty($userLogin->nim)) {
-                        Absensi::whereNull('user_id')
-                            ->whereHas('rfidCard', fn ($rfidQuery) => $rfidQuery->where('nim', $userLogin->nim))
-                            ->update(['user_id' => $userLogin->id]);
-                    }
-
-                    $query->where('absensis.user_id', $userLogin?->id ?? 0);
+                    $query->where(function ($q) use ($userLogin) {
+                        $q->where('user_id', $userLogin?->id ?? 0)
+                            ->orWhereHas('rfidCard', function ($rfidQuery) use ($userLogin) {
+                                $rfidQuery->where('nim', $userLogin?->nim ?? '');
+                            });
+                    });
                 }
             })
             ->columns([
@@ -101,7 +100,12 @@ class AbsensisTable
                         $isSuperAdmin = strtolower(trim($userLogin?->divisi?->singkatan ?? '')) === 'superadmin';
 
                         if (! $isSuperAdmin) {
-                            $query->where('absensis.user_id', $userLogin?->id ?? 0);
+                            $query->where(function ($q) use ($userLogin) {
+                                $q->where('user_id', $userLogin?->id ?? 0)
+                                    ->orWhereHas('rfidCard', function ($rfidQuery) use ($userLogin) {
+                                        $rfidQuery->where('nim', $userLogin?->nim ?? '');
+                                    });
+                            });
                         }
 
                         $absensis = $query->get();
@@ -121,7 +125,8 @@ class AbsensisTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => strtolower(trim(auth()->user()?->divisi?->singkatan ?? '')) === 'superadmin'),
                 ])->visible(fn () => strtolower(trim(auth()->user()?->divisi?->singkatan ?? '')) === 'superadmin'),
             ]);
     }
