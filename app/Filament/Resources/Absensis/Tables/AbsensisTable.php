@@ -4,6 +4,9 @@ namespace App\Filament\Resources\Absensis\Tables;
 
 use App\Models\Absensi;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -112,7 +115,13 @@ class AbsensisTable
                         }, 'data-absensi-' . now()->format('Y-m-d-H-i-s') . '.pdf');
                     }),
             ])
-            ->recordActions([])
-            ->toolbarActions([]);
+            ->recordActions([
+                DeleteAction::make(),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                ]),
+            ]);
     }
 }
