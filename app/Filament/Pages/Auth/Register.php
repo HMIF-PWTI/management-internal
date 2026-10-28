@@ -6,6 +6,7 @@ use App\Mail\AktivasiAkunMail;
 use App\Models\Divisi;
 use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\RegistrationResponse;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Facades\Filament;
@@ -15,8 +16,10 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 
 class Register extends BaseRegister
@@ -24,6 +27,30 @@ class Register extends BaseRegister
     protected static ?string $title = 'Daftar';
 
     protected Width|string|null $maxContentWidth = Width::SevenExtraLarge;
+
+    public function loginAction(): Action
+    {
+        return Action::make('login')
+            ->button()
+            ->outlined()
+            ->color('primary')
+            ->size('sm')
+            ->label('Sign in to your account')
+            ->url(filament()->getLoginUrl());
+    }
+
+    public function getSubheading(): string | Htmlable | null
+    {
+        if (! filament()->hasLogin()) {
+            return null;
+        }
+
+        return new HtmlString(
+            '<div class="mt-3 flex justify-center">' .
+            $this->loginAction->toHtml() .
+            '</div>'
+        );
+    }
 
     public function form(Schema $schema): Schema
     {
