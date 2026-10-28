@@ -22,6 +22,9 @@ Route::get('/', function () {
 Route::get('/aktivasi-akun/{user}', ActivateAccountController::class)
     ->name('akun.aktivasi');
 
+Route::get('/admin/aktivasi-akun/{user}', ActivateAccountController::class)
+    ->name('admin.akun.aktivasi');
+
 Route::middleware('auth')->prefix('admin/hmif-forms')->name('hmif-forms.actions.')->group(function () {
     Route::get('/responses/files/{file}', ResponseFileController::class)->name('response-files.download');
     Route::post('/', [FormController::class, 'store'])->name('store');

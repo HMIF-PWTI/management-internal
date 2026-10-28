@@ -26,7 +26,14 @@ class AktivasiAkunMail extends Mailable
             absolute: false,
         );
 
-        $this->activationUrl = rtrim((string) config('app.url'), '/').$signedPath;
+        $rawBaseUrl = request()->hasHeader('Host')
+            ? request()->getSchemeAndHttpHost()
+            : config('app.url');
+
+        $baseUrl = preg_replace('#/admin/?$#i', '', (string) $rawBaseUrl);
+        $baseUrl = rtrim((string) $baseUrl, '/');
+
+        $this->activationUrl = $baseUrl . $signedPath;
     }
 
     public function build()

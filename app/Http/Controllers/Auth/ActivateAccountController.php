@@ -15,7 +15,22 @@ class ActivateAccountController extends Controller
 {
     public function __invoke(Request $request, string $user): RedirectResponse
     {
-        if (! $request->hasValidRelativeSignature() && ! $request->hasValidSignature()) {
+        $hasValidSignature = $request->hasValidRelativeSignature() || $request->hasValidSignature();
+
+        if (! $hasValidSignature && str_starts_with($request->path(), 'admin/aktivasi-akun')) {
+            $relativePath = '/' . substr($request->path(), 6);
+            $simulatedRequest = Request::create(
+                $relativePath . '?' . $request->server->get('QUERY_STRING'),
+                'GET',
+                [],
+                [],
+                [],
+                $request->server->all()
+            );
+            $hasValidSignature = $simulatedRequest->hasValidRelativeSignature() || $simulatedRequest->hasValidSignature();
+        }
+
+        if (! $hasValidSignature) {
             abort(403, 'Link aktivasi tidak valid atau sudah expired.');
         }
 

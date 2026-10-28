@@ -49,6 +49,26 @@ class AccountActivationTest extends TestCase
         $this->assertSame('aktif', $user->refresh()->status_keanggotaan);
     }
 
+    public function test_activation_via_admin_prefixed_path_works(): void
+    {
+        $user = $this->createInactiveUser();
+        $signedPath = URL::temporarySignedRoute(
+            'akun.aktivasi',
+            now()->addHour(),
+            ['user' => $user->getKey()],
+            absolute: false,
+        );
+
+        $adminPrefixedUrl = '/admin' . $signedPath;
+
+        Mail::fake();
+
+        $this->get($adminPrefixedUrl)
+            ->assertRedirect('/admin/login');
+
+        $this->assertSame('aktif', $user->refresh()->status_keanggotaan);
+    }
+
     public function test_valid_link_for_a_missing_account_redirects_to_registration(): void
     {
         $url = URL::temporarySignedRoute(
