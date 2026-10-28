@@ -19,7 +19,7 @@ class AbsensisTable
 
                 $query->with([
                     'user.divisi',
-                    'rfidCard',
+                    'rfidCard.divisi',
                     'kegiatan',
                 ]);
 
@@ -45,17 +45,18 @@ class AbsensisTable
 
                 TextColumn::make('divisi_jabatan')
                     ->label('Divisi / Jabatan')
-                    ->state(fn ($record) =>
-                        (
-                            $record->user?->divisi?->singkatan
-                            ?? $record->rfidCard?->divisi
-                            ?? '-'
-                        ) . ' / ' . (
-                            $record->user?->jabatan
+                    ->state(function ($record) {
+                        $divisi = $record->user?->divisi?->singkatan
+                            ?? $record->rfidCard?->divisi?->singkatan
+                            ?? $record->rfidCard?->divisi?->nama
+                            ?? '-';
+
+                        $jabatan = $record->user?->jabatan
                             ?? $record->rfidCard?->jabatan
-                            ?? '-'
-                        )
-                    ),
+                            ?? '-';
+
+                        return "{$divisi} / {$jabatan}";
+                    }),
 
                 TextColumn::make('kegiatan.nama')
                     ->label('Kegiatan')
@@ -87,7 +88,7 @@ class AbsensisTable
                         $query = Absensi::query()
                             ->with([
                                 'user.divisi',
-                                'rfidCard',
+                                'rfidCard.divisi',
                                 'kegiatan',
                             ]);
 

@@ -55,7 +55,7 @@
                 @php
                     $nama = $absensi->user?->nama ?? $absensi->rfidCard?->nama ?? '-';
                     $nim = $absensi->user?->nim ?? $absensi->rfidCard?->nim ?? '-';
-                    $divisi = $absensi->user?->divisi?->singkatan ?? $absensi->rfidCard?->divisi ?? '-';
+                    $divisi = $absensi->user?->divisi?->singkatan ?? $absensi->rfidCard?->divisi?->singkatan ?? $absensi->rfidCard?->divisi?->nama ?? '-';
                     $jabatan = $absensi->user?->jabatan ?? $absensi->rfidCard?->jabatan ?? '-';
                 @endphp
 
