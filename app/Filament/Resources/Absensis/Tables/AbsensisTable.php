@@ -26,13 +26,16 @@ class AbsensisTable
                     'kegiatan',
                 ]);
 
-                if ($userLogin->divisi?->singkatan !== 'superadmin') {
-                    $query->where(function ($q) use ($userLogin) {
-                        $q->where('user_id', $userLogin->id)
-                            ->orWhereHas('rfidCard', function ($rfidQuery) use ($userLogin) {
-                                $rfidQuery->where('nim', $userLogin->nim);
-                            });
-                    });
+                $isSuperAdmin = strtolower(trim($userLogin?->divisi?->singkatan ?? '')) === 'superadmin';
+
+                if (! $isSuperAdmin) {
+                    if ($userLogin && ! empty($userLogin->nim)) {
+                        Absensi::whereNull('user_id')
+                            ->whereHas('rfidCard', fn ($rfidQuery) => $rfidQuery->where('nim', $userLogin->nim))
+                            ->update(['user_id' => $userLogin->id]);
+                    }
+
+                    $query->where('absensis.user_id', $userLogin?->id ?? 0);
                 }
             })
             ->columns([
@@ -95,13 +98,10 @@ class AbsensisTable
                                 'kegiatan',
                             ]);
 
-                        if ($userLogin->divisi?->singkatan !== 'superadmin') {
-                            $query->where(function ($q) use ($userLogin) {
-                                $q->where('user_id', $userLogin->id)
-                                    ->orWhereHas('rfidCard', function ($rfidQuery) use ($userLogin) {
-                                        $rfidQuery->where('nim', $userLogin->nim);
-                                    });
-                            });
+                        $isSuperAdmin = strtolower(trim($userLogin?->divisi?->singkatan ?? '')) === 'superadmin';
+
+                        if (! $isSuperAdmin) {
+                            $query->where('absensis.user_id', $userLogin?->id ?? 0);
                         }
 
                         $absensis = $query->get();
@@ -116,12 +116,13 @@ class AbsensisTable
                     }),
             ])
             ->recordActions([
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->visible(fn () => strtolower(trim(auth()->user()?->divisi?->singkatan ?? '')) === 'superadmin'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                ]),
+                ])->visible(fn () => strtolower(trim(auth()->user()?->divisi?->singkatan ?? '')) === 'superadmin'),
             ]);
     }
 }
