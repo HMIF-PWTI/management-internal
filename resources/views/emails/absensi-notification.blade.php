@@ -12,19 +12,19 @@
 
 <h2>{{ $judul }}</h2>
 
-<p>Halo {{ $absensi->user?->nama ?? 'Pengguna' }},</p>
+<p>Halo {{ $absensi->rfidCard?->nama ?? $absensi->user?->nama ?? 'Pengguna' }},</p>
 
 <p>{{ $pesan }}</p>
 
 <table cellpadding="6" cellspacing="0">
     <tr>
         <td><strong>Nama</strong></td>
-        <td>: {{ $absensi->user?->nama ?? '-' }}</td>
+        <td>: {{ $absensi->rfidCard?->nama ?? $absensi->user?->nama ?? '-' }}</td>
     </tr>
 
     <tr>
         <td><strong>NIM</strong></td>
-        <td>: {{ $absensi->user?->nim ?? '-' }}</td>
+        <td>: {{ $absensi->rfidCard?->nim ?? $absensi->user?->nim ?? '-' }}</td>
     </tr>
 
     <tr>

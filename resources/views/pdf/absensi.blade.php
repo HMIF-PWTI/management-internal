@@ -53,8 +53,8 @@
         <tbody>
             @foreach ($absensis as $absensi)
                 @php
-                    $nama = $absensi->user?->nama ?? $absensi->rfidCard?->nama ?? '-';
-                    $nim = $absensi->user?->nim ?? $absensi->rfidCard?->nim ?? '-';
+                    $nama = $absensi->rfidCard?->nama ?? $absensi->user?->nama ?? '-';
+                    $nim = $absensi->rfidCard?->nim ?? $absensi->user?->nim ?? '-';
                     $divisi = $absensi->user?->divisi?->singkatan ?? $absensi->rfidCard?->divisi?->singkatan ?? $absensi->rfidCard?->divisi?->nama ?? '-';
                     $jabatan = $absensi->user?->jabatan ?? $absensi->rfidCard?->jabatan ?? '-';
                 @endphp

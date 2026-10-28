@@ -40,13 +40,23 @@ class AbsensisTable
             ->columns([
                 TextColumn::make('nama')
                     ->label('Nama')
-                    ->state(fn ($record) => $record->user?->nama ?? $record->rfidCard?->nama ?? '-')
-                    ->searchable(),
+                    ->state(fn ($record) => $record->rfidCard?->nama ?? $record->user?->nama ?? '-')
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->whereHas('rfidCard', fn ($sub) => $sub->where('nama', 'like', "%{$search}%"))
+                                ->orWhereHas('user', fn ($sub) => $sub->where('nama', 'like', "%{$search}%"));
+                        });
+                    }),
 
                 TextColumn::make('nim')
                     ->label('NIM')
-                    ->state(fn ($record) => $record->user?->nim ?? $record->rfidCard?->nim ?? '-')
-                    ->searchable(),
+                    ->state(fn ($record) => $record->rfidCard?->nim ?? $record->user?->nim ?? '-')
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->whereHas('rfidCard', fn ($sub) => $sub->where('nim', 'like', "%{$search}%"))
+                                ->orWhereHas('user', fn ($sub) => $sub->where('nim', 'like', "%{$search}%"));
+                        });
+                    }),
 
                 TextColumn::make('divisi_jabatan')
                     ->label('Divisi / Jabatan')
