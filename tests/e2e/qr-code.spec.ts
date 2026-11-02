@@ -125,6 +125,9 @@ test.describe('QR Code generator', () => {
 
     test('scan menambah statistik lalu redirect ke link tujuan', async ({ page, request }) => {
         await openGenerator(page, 'https://hmif.example/scan-test');
+        // The generator remembers the previous QR's tracking choice.
+        if ((await page.getByRole('switch').getAttribute('aria-checked')) !== 'true') await page.getByRole('switch').click();
+        await expect.poll(() => decodeCanvas(page)).toMatch(trackingUrl);
         const scanned = (await decodeCanvas(page))!;
         await save(page);
 
