@@ -2,8 +2,9 @@
 
 namespace App\Filament\Resources\QrCodes\Tables;
 
+use App\Filament\Pages\QrCodeGenerator;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -13,6 +14,7 @@ class QrCodesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->defaultSort('id', 'desc')
             ->columns([
                 ImageColumn::make('qr_image_url')
                     ->label('QR Code')
@@ -68,7 +70,10 @@ class QrCodesTable
                     ->sortable(),
             ])
             ->recordActions([
-                EditAction::make(),
+                Action::make('edit')
+                    ->label('Edit')
+                    ->icon('heroicon-m-pencil-square')
+                    ->url(fn ($record): string => QrCodeGenerator::getUrl(['qr' => $record->id])),
                 DeleteAction::make(),
             ]);
     }

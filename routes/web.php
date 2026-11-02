@@ -43,7 +43,7 @@ Route::middleware('auth')->prefix('admin/hmif-forms')->name('hmif-forms.actions.
 Route::middleware('auth')->post('/admin/qr-code-generator', [QrCodeController::class, 'store'])
     ->name('qr-code-generator.store');
 
-Route::get('/qr/{qrCode}', [QrCodeController::class, 'track'])
+Route::get('/qr/{code}', [QrCodeController::class, 'track'])
     ->name('qr.scan');
 
 Route::middleware('auth')->prefix('forms')->group(function () {

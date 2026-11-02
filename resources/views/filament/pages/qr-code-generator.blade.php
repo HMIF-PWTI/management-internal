@@ -76,34 +76,42 @@
         @media (max-width:900px){.qr-workspace{grid-template-columns:1fr}.qr-preview{min-height:auto;padding:24px 0}.qr-url-input{font-size:16px}.qr-shell{border-radius:16px}.qr-workspace{padding:12px}}
     </style>
 
-    @if (session('status'))
-        <div class="mb-4 rounded-lg bg-success-50 px-4 py-3 text-sm font-semibold text-success-700 ring-1 ring-success-600/20 dark:bg-success-500/10 dark:text-success-300">
-            {{ session('status') }}
+    @if ($errors->any())
+        <div class="mb-4 rounded-lg bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-700 ring-1 ring-danger-600/20 dark:bg-danger-500/10 dark:text-danger-300" role="alert">
+            @foreach ($errors->all() as $error)
+                <p>{{ $error }}</p>
+            @endforeach
         </div>
     @endif
 
     @php
         $initialShape = old('shape', ($latestQrCode?->shape === 'dot' ? 'dots' : $latestQrCode?->shape) ?? 'square');
         $qrInitialState = [
-            'link' => old('link', ''),
+            'link' => old('link', $editing?->link ?? ''),
             'qr_color' => old('qr_color', $latestQrCode?->qr_color ?? '#000000'),
             'background_color' => old('background_color', $latestQrCode?->background_color ?? '#ffffff'),
             'frame' => old('frame', $latestQrCode?->frame ?? 'scan'),
             'shape' => $initialShape,
             'scan_tracking' => (bool) old('scan_tracking', $latestQrCode?->scan_tracking ?? true),
-            'total_scans' => (int) ($latestQrCode?->total_scans ?? 0),
-            'unique_scans' => (int) ($latestQrCode?->unique_scans ?? 0),
-            'top_location' => $latestQrCode?->top_location ?? '-',
-            'logo_url' => $latestQrCode?->logo_path
-                ? \Illuminate\Support\Facades\Storage::disk('public')->url($latestQrCode->logo_path)
-                : null,
+            'total_scans' => (int) ($editing?->total_scans ?? 0),
+            'unique_scans' => (int) ($editing?->unique_scans ?? 0),
+            'top_location' => $editing?->top_location ?? '-',
+            // Relative so the logo stays same-origin and can be drawn on the canvas on any host.
+            'logo_url' => $editing?->logo_path ? '/storage/' . $editing->logo_path : null,
+            'tracking_token' => $trackingToken,
+            'tracking_base_url' => \App\Models\QrCode::trackingBaseUrl(),
+            'open_logo_panel' => $errors->has('logo'),
         ];
     @endphp
 
-    <div class="qr-shell" x-data="qrCodeGenerator(@js($qrInitialState))" x-init="init()">
+    <div class="qr-shell" x-data="qrCodeGenerator(@js($qrInitialState))">
         <form class="qr-workspace" method="POST" action="{{ route('qr-code-generator.store') }}" enctype="multipart/form-data" x-on:submit="prepareAndSubmit($event)">
             @csrf
             <input type="hidden" name="qr_image_data" x-ref="qrImageData">
+            <input type="hidden" name="tracking_token" :value="trackingToken">
+            @if ($editing)
+                <input type="hidden" name="qr_code_id" value="{{ $editing->id }}">
+            @endif
             <input type="hidden" name="scan_tracking" :value="scanTracking ? '1' : '0'">
 
             <div>
@@ -112,12 +120,9 @@
                     <div class="mt-8">
                         <label class="qr-label" for="qr-url">YOUR WEBSITE URL</label>
                         <div class="qr-url-wrap">
-                            <input id="qr-url" name="link" class="qr-url-input" type="url" x-model.debounce.300ms="url">
+                            <input id="qr-url" name="link" class="qr-url-input" type="text" inputmode="url" autocomplete="url" x-model.debounce.300ms="url">
                             <span class="qr-typewriter" x-show="!url || !url.trim()">www.my-website.com/donations</span>
                         </div>
-                        @error('link')
-                            <p class="mt-2 text-sm font-semibold text-danger-600">{{ $message }}</p>
-                        @enderror
                         <p class="qr-help">Your QR Code will be generated automatically</p>
                     </div>
                     <div class="qr-switch-row">
@@ -214,7 +219,7 @@
                                 class="hidden" 
                                 type="file" 
                                 name="logo" 
-                                accept=".png,.jpg,.jpeg,.gif,.svg" 
+                                accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" 
                                 x-on:change="setLogoPreview($event)">
                             <input type="hidden" name="remove_logo" x-model="removeLogoValue">
 
@@ -222,7 +227,7 @@
                                 <span class="qr-upload-icon">☁</span>
                                 <div>
                                     <div class="qr-upload-title">Upload your logo</div>
-                                    <div class="qr-upload-note">File types: png, .jpg, .gif or .svg — max size of 2 MB</div>
+                                    <div class="qr-upload-note">File types: png, jpg, webp, gif atau svg — maksimal 10 MB</div>
                                 </div>
                             </div>
 
@@ -246,9 +251,7 @@
                                 </div>
                             </div>
 
-                            @error('logo')
-                                <p class="mt-2 text-sm font-semibold text-danger-600">{{ $message }}</p>
-                            @enderror
+                            <p class="mt-2 text-sm font-semibold text-danger-600" role="alert" x-show="logoError" x-text="logoError"></p>
                         </div>
                     </div>
 
@@ -267,25 +270,16 @@
                         <div class="qr-color-row">
                             <label class="qr-color-field">
                                 <span>QR Code Color</span>
-                                <input type="text" name="qr_color" x-model="qrColor" x-on:input="updateMainQr()">
-                                <input type="color" x-model="qrColor" x-on:input="updateMainQr()">
+                                <input type="text" name="qr_color" x-model="qrColor">
+                                <input type="color" x-model="qrColor">
                             </label>
                             <label class="qr-color-field">
                                 <span>Background Color</span>
-                                <input type="text" name="background_color" x-model="bgColor" x-on:input="updateMainQr()">
-                                <input type="color" x-model="bgColor" x-on:input="updateMainQr()">
+                                <input type="text" name="background_color" x-model="bgColor">
+                                <input type="color" x-model="bgColor">
                             </label>
                         </div>
                         <input type="hidden" name="shape" x-model="selectedShape">
-                        @error('qr_color')
-                            <p class="mt-2 text-sm font-semibold text-danger-600">{{ $message }}</p>
-                        @enderror
-                        @error('background_color')
-                            <p class="mt-2 text-sm font-semibold text-danger-600">{{ $message }}</p>
-                        @enderror
-                        @error('shape')
-                            <p class="mt-2 text-sm font-semibold text-danger-600">{{ $message }}</p>
-                        @enderror
                     </div>
                 </section>
             </div>
@@ -298,7 +292,6 @@
                     <div x-show="hasUrl()">
                         <div class="qr-code-box" :class="'frame-' + frame" :style="{ backgroundColor: bgColor }">
                             <div id="qr-main-target" class="qr-canvas-target" x-show="mainQrReady"></div>
-                            <img x-show="!mainQrReady" :src="qrImageUrl()" crossorigin="anonymous" alt="Generated QR Code">
                         </div>
                         <div class="qr-scan-label" x-show="frame === 'scan'">SCAN ME</div>
                     </div>
@@ -340,6 +333,7 @@
                     </div>
                 </div>
 
+                <p class="mt-4 max-w-56 text-center text-xs font-semibold text-danger-600" role="alert" x-show="saveError" x-text="saveError"></p>
                 <div class="qr-download" :class="{ 'opacity-50 cursor-not-allowed': !hasUrl() }">
                     <button type="button" :disabled="!hasUrl()" x-on:click="downloadJpg()">⇩ DOWNLOAD JPG</button>
                     <button type="button" :disabled="!hasUrl()" aria-label="Download options">⌄</button>
@@ -347,14 +341,14 @@
 
                 <button type="submit" 
                     class="mt-4 rounded-full bg-slate-950 px-8 py-3 text-sm font-black text-white shadow transition-all hover:bg-slate-800"
-                    :class="{ 'opacity-50 cursor-not-allowed hover:bg-slate-950': !hasUrl() }"
-                    :disabled="!hasUrl()">
-                    SAVE QR CODE
+                    :class="{ 'opacity-50 cursor-not-allowed hover:bg-slate-950': !hasUrl() || saving }"
+                    :disabled="!hasUrl() || saving"
+                    x-text="saving ? 'MENYIMPAN...' : @js($editing ? 'UPDATE QR CODE' : 'SAVE QR CODE')">
                 </button>
 
-                @if ($latestQrCode)
+                @if ($editing)
                     <p class="mt-3 text-center text-xs font-semibold text-slate-500">
-                        Last saved: {{ $latestQrCode->created_at->format('d M Y H:i') }}
+                        Last saved: {{ $editing->updated_at->format('d M Y H:i') }}
                     </p>
                 @endif
             </aside>
@@ -366,7 +360,7 @@
         function qrCodeGenerator(initialState) {
             return {
                 url: initialState.link || '',
-                panel: 'color',
+                panel: initialState.open_logo_panel ? 'logo' : 'color',
                 frame: initialState.frame || 'scan',
                 qrColor: initialState.qr_color || '#000000',
                 bgColor: initialState.background_color || '#ffffff',
@@ -380,11 +374,16 @@
                 logoFileName: initialState.logo_url ? 'Logo Tersimpan' : '',
                 removeLogoValue: '0',
                 mainQrReady: false,
+                saving: false,
+                saveError: '',
+                logoError: '',
+                trackingToken: initialState.tracking_token,
+                trackingBaseUrl: initialState.tracking_base_url,
                 mainQr: null,
                 frames: ['simple', 'scan'],
                 presets: {
-                    scanme: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><rect width="100" height="100" rx="20" fill="%230f172a"/><text x="50" y="44" fill="%23ffffff" font-family="sans-serif" font-size="24" font-weight="900" text-anchor="middle">SCAN</text><text x="50" y="76" fill="%2338bdf8" font-family="sans-serif" font-size="28" font-weight="900" text-anchor="middle">ME</text></svg>',
-                    web: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><rect width="100" height="100" rx="20" fill="%230284c7"/><circle cx="50" cy="50" r="30" fill="none" stroke="%23ffffff" stroke-width="5"/><ellipse cx="50" cy="50" rx="14" ry="30" fill="none" stroke="%23ffffff" stroke-width="5"/><line x1="20" y1="50" x2="80" y2="50" stroke="%23ffffff" stroke-width="5"/></svg>'
+                    scanme: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%230f172a%22%2F%3E%3Ctext%20x%3D%2250%22%20y%3D%2244%22%20fill%3D%22%23ffffff%22%20font-family%3D%22sans-serif%22%20font-size%3D%2224%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3ESCAN%3C%2Ftext%3E%3Ctext%20x%3D%2250%22%20y%3D%2276%22%20fill%3D%22%2338bdf8%22%20font-family%3D%22sans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22900%22%20text-anchor%3D%22middle%22%3EME%3C%2Ftext%3E%3C%2Fsvg%3E',
+                    web: 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%230284c7%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2230%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%2F%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2250%22%20rx%3D%2214%22%20ry%3D%2230%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%2F%3E%3Cline%20x1%3D%2220%22%20y1%3D%2250%22%20x2%3D%2280%22%20y2%3D%2250%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%2F%3E%3C%2Fsvg%3E'
                 },
                 shapes: [
                     {
@@ -421,25 +420,23 @@
                 hasUrl() {
                     return Boolean(this.url && this.url.trim().length > 0);
                 },
+                normalizedUrl() {
+                    const value = (this.url || '').trim();
+                    return /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
+                },
+                qrData() {
+                    return this.scanTracking
+                        ? `${this.trackingBaseUrl}/qr/${this.trackingToken}`
+                        : this.normalizedUrl();
+                },
                 logoTitle() {
                     if (this.selectedLogoType === 'scanme') return 'Preset: SCAN ME Badge';
                     if (this.selectedLogoType === 'web') return 'Preset: Web / Globe';
                     return this.logoFileName || 'Logo Kustom';
                 },
-                setPresetLogo(type) {
-                    if (this.presets[type]) {
-                        this.selectedLogoType = type;
-                        this.logoUrl = this.presets[type];
-                        this.removeLogoValue = '0';
-                        if (this.$refs.logoInput) {
-                            this.$refs.logoInput.value = '';
-                        }
-                        const fileInput = document.getElementById('qr-logo');
-                        if (fileInput) {
-                            fileInput.value = '';
-                        }
-                        this.updateMainQr();
-                    }
+                async setPresetLogo(type) {
+                    if (!this.presets[type]) return;
+                    await this.applyLogo(this.presets[type], type, '');
                 },
                 init() {
                     this.$nextTick(() => {
@@ -455,11 +452,9 @@
                             this.mainQrReady = false;
                         }
                     });
-                    this.$watch('selectedShape', () => { if (this.hasUrl()) this.updateMainQr(); });
-                    this.$watch('qrColor', () => { if (this.hasUrl()) this.updateMainQr(); });
-                    this.$watch('bgColor', () => { if (this.hasUrl()) this.updateMainQr(); });
-                    this.$watch('logoUrl', () => { if (this.hasUrl()) this.updateMainQr(); });
-                    this.$watch('frame', () => { if (this.hasUrl()) this.updateMainQr(); });
+                    ['selectedShape', 'qrColor', 'bgColor', 'logoUrl', 'scanTracking'].forEach((key) => {
+                        this.$watch(key, () => this.updateMainQr());
+                    });
                 },
                 getCornerSquareType(shape) {
                     if (shape === 'dots') return 'dot';
@@ -477,9 +472,6 @@
                 },
                 selectShape(shapeId) {
                     this.selectedShape = shapeId;
-                    if (this.hasUrl()) {
-                        this.updateMainQr();
-                    }
                 },
                 initShapePreviews() {
                     if (typeof QRCodeStyling === 'undefined') return;
@@ -517,6 +509,29 @@
                         }
                     });
                 },
+                qrOptions(size, logoMargin) {
+                    const dotType = this.selectedShape || 'square';
+                    const color = this.qrColor || '#000000';
+
+                    return {
+                        width: size,
+                        height: size,
+                        type: 'canvas',
+                        data: this.qrData(),
+                        image: this.logoUrl || undefined,
+                        dotsOptions: { type: dotType, color },
+                        backgroundOptions: { color: this.bgColor || '#ffffff' },
+                        cornersSquareOptions: { type: this.getCornerSquareType(dotType), color },
+                        cornersDotOptions: { type: this.getCornerDotType(dotType), color },
+                        imageOptions: {
+                            crossOrigin: 'anonymous',
+                            margin: logoMargin,
+                            hideBackgroundDots: true,
+                            imageSize: 0.35,
+                        },
+                        qrOptions: { errorCorrectionLevel: 'H' },
+                    };
+                },
                 initMainQr() {
                     if (typeof QRCodeStyling === 'undefined' || !this.hasUrl()) {
                         this.mainQrReady = false;
@@ -526,39 +541,7 @@
                     if (!target) return;
                     target.innerHTML = '';
 
-                    const dotType = this.selectedShape || 'square';
-                    this.mainQr = new QRCodeStyling({
-                        width: 220,
-                        height: 220,
-                        type: 'canvas',
-                        data: this.url.trim(),
-                        image: this.logoUrl || undefined,
-                        dotsOptions: {
-                            type: dotType,
-                            color: this.qrColor || '#000000',
-                        },
-                        backgroundOptions: {
-                            color: this.bgColor || '#ffffff',
-                        },
-                        cornersSquareOptions: {
-                            type: this.getCornerSquareType(dotType),
-                            color: this.qrColor || '#000000',
-                        },
-                        cornersDotOptions: {
-                            type: this.getCornerDotType(dotType),
-                            color: this.qrColor || '#000000',
-                        },
-                        imageOptions: {
-                            crossOrigin: 'anonymous',
-                            margin: 4,
-                            hideBackgroundDots: true,
-                            imageSize: 0.35,
-                        },
-                        qrOptions: {
-                            errorCorrectionLevel: 'H',
-                        }
-                    });
-
+                    this.mainQr = new QRCodeStyling(this.qrOptions(220, 4));
                     this.mainQr.append(target);
                     this.mainQrReady = true;
                 },
@@ -572,261 +555,180 @@
                         this.initMainQr();
                         return;
                     }
-                    const dotType = this.selectedShape || 'square';
-                    this.mainQr.update({
-                        data: this.url.trim(),
-                        image: this.logoUrl || undefined,
-                        dotsOptions: {
-                            type: dotType,
-                            color: this.qrColor || '#000000',
-                        },
-                        backgroundOptions: {
-                            color: this.bgColor || '#ffffff',
-                        },
-                        cornersSquareOptions: {
-                            type: this.getCornerSquareType(dotType),
-                            color: this.qrColor || '#000000',
-                        },
-                        cornersDotOptions: {
-                            type: this.getCornerDotType(dotType),
-                            color: this.qrColor || '#000000',
-                        },
-                        imageOptions: {
-                            crossOrigin: 'anonymous',
-                            margin: 4,
-                            hideBackgroundDots: true,
-                            imageSize: 0.35,
-                        },
-                        qrOptions: {
-                            errorCorrectionLevel: 'H',
-                        }
-                    });
+                    this.mainQr.update(this.qrOptions(220, 4));
                     this.mainQrReady = true;
                 },
-                cleanColor(value) {
-                    return (value || '').replace('#', '').toUpperCase();
-                },
-                encodedUrl() {
-                    return encodeURIComponent(this.url ? this.url.trim() : '');
-                },
-                qrImageUrl(format = 'png') {
-                    if (!this.hasUrl()) return '';
-                    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=${format}&color=${this.cleanColor(this.qrColor)}&bgcolor=${this.cleanColor(this.bgColor)}&ecc=H&data=${this.encodedUrl()}`;
+                async renderFramedCanvas() {
+                    const qrSize = 720;
+                    const rawBlob = await new QRCodeStyling(this.qrOptions(qrSize, 12)).getRawData('png');
+                    const qrUrl = URL.createObjectURL(rawBlob);
+                    const qrImg = await this.loadImage(qrUrl);
+                    URL.revokeObjectURL(qrUrl);
+
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    if (this.frame === 'none') {
+                        canvas.width = qrSize;
+                        canvas.height = qrSize;
+                        ctx.drawImage(qrImg, 0, 0, qrSize, qrSize);
+                    } else if (this.frame === 'simple') {
+                        const totalSize = 900;
+                        canvas.width = totalSize;
+                        canvas.height = totalSize;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, totalSize, totalSize);
+
+                        const boxPadding = 50;
+                        const boxSize = totalSize - boxPadding * 2;
+                        ctx.lineWidth = 18;
+                        ctx.strokeStyle = '#050505';
+                        ctx.strokeRect(boxPadding, boxPadding, boxSize, boxSize);
+                        ctx.drawImage(qrImg, boxPadding + 36, boxPadding + 36, boxSize - 72, boxSize - 72);
+                    } else {
+                        const width = 900;
+                        const height = 1080;
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, width, height);
+
+                        const boxPadding = 60;
+                        const boxWidth = width - boxPadding * 2;
+                        const boxHeight = 800;
+                        ctx.lineWidth = 20;
+                        ctx.strokeStyle = '#050505';
+                        ctx.strokeRect(boxPadding, boxPadding, boxWidth, boxHeight);
+                        ctx.drawImage(qrImg, boxPadding + 30, boxPadding + 30, boxWidth - 60, boxWidth - 60);
+
+                        const pillWidth = 420;
+                        const pillHeight = 90;
+                        const pillX = (width - pillWidth) / 2;
+                        const pillY = boxPadding + boxHeight + 40;
+
+                        ctx.fillStyle = '#050505';
+                        ctx.beginPath();
+                        ctx.moveTo(width / 2, pillY - 26);
+                        ctx.lineTo(width / 2 - 30, pillY + 2);
+                        ctx.lineTo(width / 2 + 30, pillY + 2);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        if (ctx.roundRect) {
+                            ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 18);
+                        } else {
+                            ctx.rect(pillX, pillY, pillWidth, pillHeight);
+                        }
+                        ctx.fill();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '900 44px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('SCAN ME', width / 2, pillY + pillHeight / 2);
+                    }
+
+                    return canvas;
                 },
                 async prepareAndSubmit(event) {
                     event.preventDefault();
 
-                    if (!this.hasUrl()) {
-                        alert('Silakan masukkan link/URL website terlebih dahulu.');
-                        return;
-                    }
+                    if (!this.hasUrl() || this.saving) return;
 
-                    const form = event.target;
+                    this.url = this.normalizedUrl();
+                    this.saving = true;
+                    this.saveError = '';
 
                     try {
-                        // 1. Try to get canvas image data directly from DOM
-                        const canvas = document.querySelector('#qr-main-target canvas');
-                        if (canvas && this.$refs.qrImageData) {
-                            this.$refs.qrImageData.value = canvas.toDataURL('image/png');
-                            form.submit();
-                            return;
-                        }
-
-                        // 2. Otherwise get raw data from QRCodeStyling
-                        if (this.mainQr) {
-                            const blob = await this.mainQr.getRawData('png');
-                            if (blob && this.$refs.qrImageData) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                    this.$refs.qrImageData.value = reader.result;
-                                    form.submit();
-                                };
-                                reader.readAsDataURL(blob);
-                                return;
-                            }
-                        }
+                        const canvas = await this.renderFramedCanvas();
+                        this.$refs.qrImageData.value = canvas.toDataURL('image/png');
+                        event.target.submit();
                     } catch (e) {
-                        console.error('Failed to capture QR image data', e);
+                        console.error('Failed to render QR image', e);
+                        this.saving = false;
+                        this.saveError = 'QR Code gagal dibuat. Coba ganti logo lalu simpan lagi.';
                     }
-
-                    form.submit();
                 },
                 async downloadJpg() {
-                    if (!this.hasUrl()) {
-                        alert('Silakan masukkan link/URL website terlebih dahulu.');
-                        return;
-                    }
+                    if (!this.hasUrl()) return;
 
                     try {
-                        const qrSize = 720;
-                        const tempQr = new QRCodeStyling({
-                            width: qrSize,
-                            height: qrSize,
-                            type: 'canvas',
-                            data: this.url.trim(),
-                            image: this.logoUrl || undefined,
-                            dotsOptions: {
-                                type: this.selectedShape || 'square',
-                                color: this.qrColor || '#000000',
-                            },
-                            backgroundOptions: {
-                                color: this.bgColor || '#ffffff',
-                            },
-                            cornersSquareOptions: {
-                                type: this.getCornerSquareType(this.selectedShape),
-                                color: this.qrColor || '#000000',
-                            },
-                            cornersDotOptions: {
-                                type: this.getCornerDotType(this.selectedShape),
-                                color: this.qrColor || '#000000',
-                            },
-                            imageOptions: {
-                                crossOrigin: 'anonymous',
-                                margin: 12,
-                                hideBackgroundDots: true,
-                                imageSize: 0.35,
-                            },
-                            qrOptions: {
-                                errorCorrectionLevel: 'H',
-                            }
-                        });
-
-                        const rawBlob = await tempQr.getRawData('png');
-                        if (!rawBlob) return;
-
-                        const qrImg = await new Promise((resolve, reject) => {
-                            const img = new Image();
-                            img.onload = () => resolve(img);
-                            img.onerror = reject;
-                            img.src = URL.createObjectURL(rawBlob);
-                        });
-
-                        if (this.frame === 'none') {
-                            const canvas = document.createElement('canvas');
-                            canvas.width = qrSize;
-                            canvas.height = qrSize;
-                            const ctx = canvas.getContext('2d');
-                            ctx.fillStyle = this.bgColor || '#ffffff';
-                            ctx.fillRect(0, 0, qrSize, qrSize);
-                            ctx.drawImage(qrImg, 0, 0, qrSize, qrSize);
-
-                            const link = document.createElement('a');
-                            link.download = 'qr-code.jpg';
-                            link.href = canvas.toDataURL('image/jpeg', 0.95);
-                            link.click();
-                        } else if (this.frame === 'simple') {
-                            const totalSize = 900;
-                            const canvas = document.createElement('canvas');
-                            canvas.width = totalSize;
-                            canvas.height = totalSize;
-                            const ctx = canvas.getContext('2d');
-                            ctx.fillStyle = '#ffffff';
-                            ctx.fillRect(0, 0, totalSize, totalSize);
-
-                            const borderW = 18;
-                            const boxPadding = 50;
-                            const boxSize = totalSize - boxPadding * 2;
-                            ctx.lineWidth = borderW;
-                            ctx.strokeStyle = '#050505';
-                            ctx.strokeRect(boxPadding, boxPadding, boxSize, boxSize);
-
-                            const qrOffset = boxPadding + 36;
-                            const qrDrawSize = boxSize - 72;
-                            ctx.drawImage(qrImg, qrOffset, qrOffset, qrDrawSize, qrDrawSize);
-
-                            const link = document.createElement('a');
-                            link.download = 'qr-code.jpg';
-                            link.href = canvas.toDataURL('image/jpeg', 0.95);
-                            link.click();
-                        } else {
-                            const width = 900;
-                            const height = 1080;
-                            const canvas = document.createElement('canvas');
-                            canvas.width = width;
-                            canvas.height = height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.fillStyle = '#ffffff';
-                            ctx.fillRect(0, 0, width, height);
-
-                            const borderW = 20;
-                            const boxPadding = 60;
-                            const boxWidth = width - boxPadding * 2;
-                            const boxHeight = 800;
-                            ctx.lineWidth = borderW;
-                            ctx.strokeStyle = '#050505';
-                            ctx.strokeRect(boxPadding, boxPadding, boxWidth, boxHeight);
-
-                            const qrOffset = boxPadding + 30;
-                            const qrDrawSize = boxWidth - 60;
-                            ctx.drawImage(qrImg, qrOffset, qrOffset, qrDrawSize, qrDrawSize);
-
-                            const pillWidth = 420;
-                            const pillHeight = 90;
-                            const pillX = (width - pillWidth) / 2;
-                            const pillY = boxPadding + boxHeight + 40;
-
-                            ctx.fillStyle = '#050505';
-                            ctx.beginPath();
-                            ctx.moveTo(width / 2, pillY - 26);
-                            ctx.lineTo(width / 2 - 30, pillY + 2);
-                            ctx.lineTo(width / 2 + 30, pillY + 2);
-                            ctx.closePath();
-                            ctx.fill();
-
-                            ctx.beginPath();
-                            if (ctx.roundRect) {
-                                ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 18);
-                            } else {
-                                ctx.rect(pillX, pillY, pillWidth, pillHeight);
-                            }
-                            ctx.fill();
-
-                            ctx.fillStyle = '#ffffff';
-                            ctx.font = '900 44px sans-serif';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'middle';
-                            ctx.fillText('SCAN ME', width / 2, pillY + pillHeight / 2);
-
-                            const link = document.createElement('a');
-                            link.download = 'qr-code.jpg';
-                            link.href = canvas.toDataURL('image/jpeg', 0.95);
-                            link.click();
-                        }
-                    } catch (err) {
-                        console.error('Download failed:', err);
+                        const canvas = await this.renderFramedCanvas();
+                        const link = document.createElement('a');
+                        link.download = 'qr-code.jpg';
+                        link.href = canvas.toDataURL('image/jpeg', 0.95);
+                        link.click();
+                    } catch (e) {
+                        console.error('Download failed:', e);
+                        this.saveError = 'QR Code gagal diunduh. Coba ganti logo lalu unduh lagi.';
                     }
                 },
-                setLogoPreview(event) {
+                loadImage(src) {
+                    return new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.onload = () => resolve(img);
+                        img.onerror = reject;
+                        img.src = src;
+                    });
+                },
+                // Logos become a 512px PNG here: broken files stop at this step, and the
+                // QR library and the server only ever receive one small, safe format.
+                async logoToPng(src) {
+                    const img = await this.loadImage(src);
+                    const max = 512;
+                    // SVG files without width/height report 0.
+                    const sourceWidth = img.naturalWidth || max;
+                    const sourceHeight = img.naturalHeight || max;
+                    const scale = Math.min(max / sourceWidth, max / sourceHeight, 1);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+                    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    return canvas;
+                },
+                async applyLogo(src, type, fileName) {
+                    const canvas = await this.logoToPng(src);
+                    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+                    const transfer = new DataTransfer();
+                    transfer.items.add(new File([blob], 'logo.png', { type: 'image/png' }));
+
+                    this.$refs.logoInput.files = transfer.files;
+                    this.logoUrl = canvas.toDataURL('image/png');
+                    this.selectedLogoType = type;
+                    this.logoFileName = fileName;
+                    this.removeLogoValue = '0';
+                    this.logoError = '';
+                },
+                async setLogoPreview(event) {
                     const [file] = event.target.files;
                     if (!file) return;
 
-                    this.logoFileName = file.name;
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        this.logoUrl = e.target.result;
-                        this.selectedLogoType = 'custom';
-                        this.removeLogoValue = '0';
-                        if (this.hasUrl()) {
-                            this.updateMainQr();
-                        }
-                    };
-                    reader.readAsDataURL(file);
+                    if (file.size > 10 * 1024 * 1024) {
+                        event.target.value = '';
+                        this.logoError = 'Ukuran logo maksimal 10 MB.';
+                        return;
+                    }
+
+                    const objectUrl = URL.createObjectURL(file);
+                    try {
+                        await this.applyLogo(objectUrl, 'custom', file.name);
+                    } catch (e) {
+                        event.target.value = '';
+                        this.logoError = `"${file.name}" bukan gambar yang bisa dibaca. Gunakan PNG, JPG, WebP, GIF, atau SVG.`;
+                    } finally {
+                        URL.revokeObjectURL(objectUrl);
+                    }
                 },
                 removeLogo() {
                     this.logoUrl = null;
                     this.logoFileName = '';
                     this.selectedLogoType = 'none';
                     this.removeLogoValue = '1';
-                    if (this.$refs.logoInput) {
-                        this.$refs.logoInput.value = '';
-                    }
-                    const fileInput = document.getElementById('qr-logo');
-                    if (fileInput) {
-                        fileInput.value = '';
-                    }
-                    if (this.hasUrl()) {
-                        this.updateMainQr();
-                    }
+                    this.logoError = '';
+                    this.$refs.logoInput.value = '';
                 },
             };
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Filament\Resources\QrCodes\QrCodeResource;
 use App\Models\QrCode;
+use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -14,72 +15,87 @@ class QrCodeController extends Controller
 {
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->canAccessFitur('QR Code'), 403);
+
+        $existing = $request->filled('qr_code_id')
+            ? QrCode::where('user_id', $request->user()->id)->findOrFail($request->integer('qr_code_id'))
+            : null;
+
         $validated = $request->validate([
-            'link' => ['required', 'url', 'max:2048'],
-            'logo' => ['nullable', 'file', 'mimes:png,jpg,jpeg,gif,svg', 'max:2048'],
+            'link' => ['required', 'url:http,https', 'max:2048'],
+            'tracking_token' => [
+                'required',
+                'ulid',
+                Rule::unique('qr_codes', 'tracking_token')->ignore($existing?->id),
+            ],
+            // The browser converts every logo to a small PNG, so nothing here can exhaust memory or carry SVG scripts.
+            'logo' => ['nullable', 'file', 'mimes:png', 'max:2048', 'dimensions:max_width=1024,max_height=1024'],
             'qr_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'background_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'frame' => ['required', Rule::in(['none', 'simple', 'scan'])],
             'shape' => ['required', Rule::in([
                 'square',
                 'dots',
-                'dot',
                 'rounded',
                 'extra-rounded',
                 'classy',
                 'classy-rounded',
             ])],
-            'scan_tracking' => ['nullable'],
-            'qr_image_data' => ['nullable', 'string'],
+            'scan_tracking' => ['required', 'boolean'],
+            'qr_image_data' => ['required', 'string', 'max:6000000', function (string $attribute, string $value, \Closure $fail) {
+                if ($this->decodePng($value) === null) {
+                    $fail('Gambar QR Code tidak valid. Muat ulang halaman lalu coba lagi.');
+                }
+            }],
+        ], [
+            'tracking_token.unique' => 'QR Code ini sudah tersimpan. Muat ulang halaman untuk membuat yang baru.',
+            'logo.*' => 'Logo tidak valid. Pilih ulang gambar logo.',
         ]);
 
-        $logoPath = null;
+        $logoPath = $existing?->logo_path;
 
         if ($request->hasFile('logo')) {
             $logoPath = $request->file('logo')->store('qr-logos', 'public');
+        } elseif ($request->boolean('remove_logo')) {
+            $logoPath = null;
         }
 
-        $shape = $validated['shape'] === 'dot' ? 'dots' : $validated['shape'];
-        $scanTracking = $request->has('scan_tracking') ? $request->boolean('scan_tracking') : true;
+        $filename = 'qr-codes/' . Str::random(40) . '.png';
+        /** @var \Illuminate\Filesystem\FilesystemAdapter $storage */
+        $storage = Storage::disk('public');
+        $storage->put($filename, $this->decodePng($validated['qr_image_data']));
 
-        $qrImageUrl = null;
-        if (!empty($validated['qr_image_data']) && str_starts_with($validated['qr_image_data'], 'data:image/')) {
-            $data = $validated['qr_image_data'];
-            @list($type, $data) = explode(';', $data);
-            @list(, $data) = explode(',', $data);
-            $decoded = base64_decode($data);
-            if ($decoded !== false) {
-                $filename = 'qr-codes/' . Str::random(40) . '.png';
-                /** @var \Illuminate\Filesystem\FilesystemAdapter $storage */
-                $storage = Storage::disk('public');
-                $storage->put($filename, $decoded);
-                $qrImageUrl = $storage->url($filename);
-            }
-        }
-
-        $qrCode = QrCode::create([
-            'user_id' => $request->user()->id,
+        $attributes = [
             'link' => $validated['link'],
             'logo_path' => $logoPath,
             'qr_color' => strtolower($validated['qr_color']),
             'background_color' => strtolower($validated['background_color']),
             'frame' => $validated['frame'],
-            'shape' => $shape,
-            'scan_tracking' => $scanTracking,
-            'qr_image_url' => $qrImageUrl,
-        ]);
+            'shape' => $validated['shape'],
+            'scan_tracking' => $request->boolean('scan_tracking'),
+            'qr_image_url' => $storage->url($filename),
+        ];
 
-        if ($scanTracking) {
-            $qrCode->refreshQrImage();
+        if ($existing) {
+            $existing->update($attributes);
+        } else {
+            QrCode::create([
+                ...$attributes,
+                'user_id' => $request->user()->id,
+                'tracking_token' => $validated['tracking_token'],
+            ]);
         }
 
-        return redirect()
-            ->to(QrCodeResource::getUrl('index'))
-            ->with('status', 'QR Code berhasil disimpan ke database.');
+        Notification::make()->title('QR Code berhasil disimpan.')->success()->send();
+
+        return redirect()->to(QrCodeResource::getUrl('index'));
     }
 
-    public function track(Request $request, QrCode $qrCode): RedirectResponse
+    public function track(Request $request, string $code): RedirectResponse
     {
+        // Numeric ids keep QR codes printed before tracking tokens existed working.
+        $qrCode = QrCode::where(ctype_digit($code) ? 'id' : 'tracking_token', $code)->firstOrFail();
+
         if ($qrCode->scan_tracking) {
             $qrCode->increment('total_scans');
 
@@ -97,5 +113,16 @@ class QrCodeController extends Controller
         }
 
         return redirect()->away($qrCode->link);
+    }
+
+    private function decodePng(string $dataUrl): ?string
+    {
+        if (! str_starts_with($dataUrl, 'data:image/png;base64,')) {
+            return null;
+        }
+
+        $binary = base64_decode(Str::after($dataUrl, 'data:image/png;base64,'), true);
+
+        return $binary !== false && str_starts_with($binary, "\x89PNG\r\n\x1a\n") ? $binary : null;
     }
 }

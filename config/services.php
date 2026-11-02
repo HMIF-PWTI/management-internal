@@ -37,4 +37,7 @@ return [
     'rfid' => [
         'api_key' => env('RFID_API_KEY'),
     ],
+    'qr' => [
+        'public_url' => env('QR_PUBLIC_URL', env('APP_URL')),
+    ],
 ];

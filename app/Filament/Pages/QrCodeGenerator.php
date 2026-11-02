@@ -6,6 +6,7 @@ use App\Models\QrCode;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class QrCodeGenerator extends Page
 {
@@ -27,17 +28,20 @@ class QrCodeGenerator extends Page
 
     public static function canAccess(): bool
     {
-        // Disembunyikan sementara sampai ditentukan divisi mana yang boleh mengakses
-        return false;
+        return Auth::user()?->canAccessFitur('QR Code') ?? false;
     }
 
     public function getViewData(): array
     {
+        $editing = request()->filled('qr')
+            ? QrCode::where('user_id', Auth::id())->findOrFail(request()->integer('qr'))
+            : null;
+
         return [
-            'latestQrCode' => QrCode::query()
-                ->where('user_id', Auth::id())
-                ->latest()
-                ->first(),
+            'editing' => $editing,
+            'latestQrCode' => $editing ?? QrCode::where('user_id', Auth::id())->latest()->first(),
+            // Known before saving so the preview, the download and the stored image encode the same URL.
+            'trackingToken' => old('tracking_token', $editing?->tracking_token ?? (string) Str::ulid()),
         ];
     }
 }
