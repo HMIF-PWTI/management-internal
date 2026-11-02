@@ -67,7 +67,6 @@
         .qr-stat-val{font-weight:800;color:#0f172a;background:#f1f5f9;border-radius:4px;padding:1px 8px;font-size:11px}
         .qr-download{margin-top:34px;display:flex;align-items:center;overflow:hidden;border-radius:999px;background:#0788df;color:#fff;box-shadow:0 4px 10px rgba(7,136,223,.3);transition:opacity .2s ease}
         .qr-download button:first-child{padding:12px 52px;color:#fff;font-weight:900;text-decoration:none}
-        .qr-download button:last-child{height:44px;width:44px;border-left:1px solid rgba(255,255,255,.35);font-size:24px}
         .qr-logo-actions{display:flex;align-items:center;gap:12px;margin-top:16px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:12px;padding:12px 16px}
         .qr-remove-logo{border-radius:999px;background:#fee2e2;padding:6px 14px;color:#b91c1c;font-size:12px;font-weight:800;border:1px solid #fca5a5;cursor:pointer;transition:all .15s ease}
         .qr-remove-logo:hover{background:#fecaca}
@@ -333,10 +332,9 @@
                     </div>
                 </div>
 
-                <p class="mt-4 max-w-56 text-center text-xs font-semibold text-danger-600" role="alert" x-show="saveError" x-text="saveError"></p>
+                <p style="max-width:14rem" class="mt-4 text-center text-xs font-semibold text-danger-600" role="alert" x-show="saveError" x-text="saveError"></p>
                 <div class="qr-download" :class="{ 'opacity-50 cursor-not-allowed': !hasUrl() }">
                     <button type="button" :disabled="!hasUrl()" x-on:click="downloadJpg()">⇩ DOWNLOAD JPG</button>
-                    <button type="button" :disabled="!hasUrl()" aria-label="Download options">⌄</button>
                 </div>
 
                 <button type="submit" 
