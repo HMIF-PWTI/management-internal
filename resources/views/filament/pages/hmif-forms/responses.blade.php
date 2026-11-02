@@ -1,6 +1,7 @@
 <x-filament-panels::page>
     <style>
         .hmif-option-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.25rem .75rem;padding:.5rem 0;font-size:.875rem;color:rgb(55 65 81)}
+        .hmif-answer-row{border-bottom:1px solid rgb(243 244 246);padding:.5rem 0;font-size:.875rem;color:rgb(55 65 81)}.dark .hmif-answer-row{border-color:rgb(255 255 255/.1);color:rgb(209 213 219)}
         .hmif-option-track{grid-column:1/-1;height:8px;overflow:hidden;border-radius:4px;background:rgb(243 244 246)}
         .hmif-option-fill{display:block;height:100%;border-radius:4px;background:var(--primary-500)}
         .hmif-option-count{font-variant-numeric:tabular-nums;color:rgb(17 24 39);font-weight:600}
@@ -19,7 +20,7 @@
         </div>
     </div>
 
-    <div class="space-y-6" x-data="{ tab: @js(request()->has('page') ? 'individual' : 'summary') }">
+    <div style="display:grid;gap:1.5rem;min-width:0" x-data="{ tab: @js(request()->has('page') ? 'individual' : 'summary') }">
         <x-filament::tabs>
             <x-filament::tabs.item alpine-active="tab === 'summary'" x-on:click="tab = 'summary'">Summary</x-filament::tabs.item>
             <x-filament::tabs.item alpine-active="tab === 'individual'" x-on:click="tab = 'individual'">Individual</x-filament::tabs.item>
@@ -32,7 +33,7 @@
                     <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">{{ $question->type === 'file_upload' ? $question->responseFiles->count() . ' files' : $item['answered'] . ' answers' }}</p>
                     @if ($question->type === 'file_upload')
                         @foreach ($question->responseFiles->take(5) as $file)
-                            <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2 text-sm dark:border-white/10 dark:text-gray-300">
+                            <div class="hmif-answer-row flex items-center justify-between gap-3">
                                 <span class="min-w-0 truncate">{{ $file->original_name }} · {{ number_format($file->size / 1048576, 2) }} MB</span>
                                 <a class="text-primary-600 dark:text-primary-400" href="{{ route('hmif-forms.actions.response-files.download', $file) }}">Download</a>
                             </div>
@@ -48,7 +49,7 @@
                         @endforeach
                     @else
                         @forelse ($item['latest'] as $value)
-                            <p class="border-b border-gray-100 py-2 text-sm dark:border-white/10 dark:text-gray-300">{{ $value }}</p>
+                            <p class="hmif-answer-row">{{ $value }}</p>
                         @empty
                             <p class="text-sm text-gray-500">Belum ada jawaban.</p>
                         @endforelse
