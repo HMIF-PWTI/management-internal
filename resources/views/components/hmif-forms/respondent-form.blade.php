@@ -14,7 +14,7 @@
         'description' => $section->description,
         'after_section_action' => $section->after_section_action === 'continue' ? 'continue_next' : $section->after_section_action,
         'after_section_target_id' => $section->after_section_target_id,
-        'questions' => $section->questions->sortBy('sort_order')->values(),
+        'questions' => $section->questions->values(),
     ]);
 
     if ($respondentSections->isEmpty()) {
@@ -24,7 +24,7 @@
             'description' => null,
             'after_section_action' => 'submit',
             'after_section_target_id' => null,
-            'questions' => $form->questions->sortBy('sort_order')->values(),
+            'questions' => $form->questions->values(),
         ]]);
     }
 
@@ -65,6 +65,10 @@
                 @if ($headerImage)
                     <img src="{{ $headerImage }}" class="hmif-respondent-banner" alt="Header {{ $form->title }}">
                 @endif
+
+                @error('form')
+                    <section class="hmif-respondent-card" role="alert"><p class="hmif-respondent-error">{{ $message }}</p></section>
+                @enderror
 
                 <form
                     novalidate
@@ -123,6 +127,7 @@
                             @endif
 
                             @foreach ($section['questions'] as $question)
+                                @php $oldAnswer = $isPreview ? null : old('answers.' . $question->id); @endphp
                                 <div class="hmif-respondent-card" role="group">
                                     <div class="hmif-respondent-question">
                                         {{ $question->label }}
@@ -130,6 +135,10 @@
                                             <span class="hmif-respondent-required">*</span>
                                         @endif
                                     </div>
+
+                                    @if (filled($question->description))
+                                        <p class="hmif-respondent-description" style="margin:-8px 0 12px">{{ $question->description }}</p>
+                                    @endif
 
                                     @if ($question->type === 'file_upload')
                                         @php
@@ -143,7 +152,7 @@
                                     @elseif ($question->type === 'radio')
                                         @foreach ($question->options as $option)
                                             <label class="hmif-respondent-option">
-                                                <input type="radio" name="answers[{{ $question->id }}]" value="{{ $option->value ?: $option->label }}" @required($question->is_required)>
+                                                <input type="radio" name="answers[{{ $question->id }}]" value="{{ $option->value ?: $option->label }}" @checked($oldAnswer === ($option->value ?: $option->label)) @required($question->is_required)>
                                                 <span>{{ $option->label }}</span>
                                             </label>
                                         @endforeach
@@ -151,7 +160,7 @@
                                         <div @if ($question->is_required) data-required-checkbox-group @endif>
                                             @foreach ($question->options as $option)
                                                 <label class="hmif-respondent-option">
-                                                    <input type="checkbox" name="answers[{{ $question->id }}][]" value="{{ $option->value ?: $option->label }}">
+                                                    <input type="checkbox" name="answers[{{ $question->id }}][]" value="{{ $option->value ?: $option->label }}" @checked(in_array($option->value ?: $option->label, (array) $oldAnswer, true))>
                                                     <span>{{ $option->label }}</span>
                                                 </label>
                                             @endforeach
@@ -160,7 +169,7 @@
                                         <select class="hmif-respondent-control hmif-respondent-control--single" name="answers[{{ $question->id }}]" @required($question->is_required)>
                                             <option value="">Pilih opsi</option>
                                             @foreach ($question->options as $option)
-                                                <option value="{{ $option->value ?: $option->label }}">{{ $option->label }}</option>
+                                                <option value="{{ $option->value ?: $option->label }}" @selected($oldAnswer === ($option->value ?: $option->label))>{{ $option->label }}</option>
                                             @endforeach
                                         </select>
                                     @else
@@ -168,9 +177,9 @@
                                     @endif
 
                                     @unless ($isPreview)
-                                        @error('answers.' . $question->id)
-                                            <p class="hmif-respondent-error">{{ $message }}</p>
-                                        @enderror
+                                        @if ($answerError = $errors->first('answers.' . $question->id) ?: $errors->first('answers.' . $question->id . '.*'))
+                                            <p class="hmif-respondent-error">{{ $answerError }}</p>
+                                        @endif
                                     @endunless
                                 </div>
                             @endforeach
@@ -199,5 +208,5 @@
 </div>
 
 <script>
-document.querySelectorAll('.hmif-respondent-form').forEach(form=>{const pages=[...form.querySelectorAll('[data-section-page]')];if(!pages.length)return;let current=0;let history=[];const label=form.querySelector('[data-progress-label]'),percentText=form.querySelector('[data-progress-percent]'),fill=form.querySelector('[data-progress-fill]');const show=i=>{current=Math.max(0,Math.min(i,pages.length-1));pages.forEach((page,index)=>page.hidden=index!==current);const percent=Math.round((current+1)/pages.length*100);if(label)label.textContent=`Section ${current+1} of ${pages.length}`;if(percentText)percentText.textContent=`${percent}%`;if(fill)fill.style.width=`${percent}%`;window.scrollTo({top:0,behavior:'smooth'})};const validate=page=>{page.querySelectorAll('[data-required-checkbox-group]').forEach(group=>{const boxes=[...group.querySelectorAll('input[type=checkbox]')];if(boxes[0])boxes[0].setCustomValidity(boxes.some(box=>box.checked)?'':'Pertanyaan ini wajib diisi.')});const invalid=[...page.querySelectorAll('input,textarea,select')].find(control=>!control.checkValidity());if(invalid){invalid.reportValidity();return false}return true};form.querySelectorAll('[data-section-next]').forEach(button=>button.addEventListener('click',()=>{if(!validate(pages[current]))return;const page=pages[current];const target=page.dataset.navigationAction==='go_to_section'?Number(page.dataset.navigationTarget):current+1;if(!Number.isInteger(target)||!pages[target])return;history.push(current);show(target)}));form.querySelectorAll('[data-section-back]').forEach(button=>button.addEventListener('click',()=>{if(history.length)show(history.pop())}));form.addEventListener('reset',()=>setTimeout(()=>{history=[];show(0)}));form.addEventListener('submit',event=>{event.preventDefault();if(!validate(pages[current]))return;if(form.dataset.preview==='1'){if(window.FilamentNotification)new FilamentNotification().title('Preview berhasil. Jawaban tidak disimpan.').success().send();return}HTMLFormElement.prototype.submit.call(form)});show(0)});
+document.querySelectorAll('.hmif-respondent-form').forEach(form=>{const pages=[...form.querySelectorAll('[data-section-page]')];if(!pages.length)return;let current=0;let history=[];const label=form.querySelector('[data-progress-label]'),percentText=form.querySelector('[data-progress-percent]'),fill=form.querySelector('[data-progress-fill]');const show=i=>{current=Math.max(0,Math.min(i,pages.length-1));pages.forEach((page,index)=>page.hidden=index!==current);const percent=Math.round((current+1)/pages.length*100);if(label)label.textContent=`Section ${current+1} of ${pages.length}`;if(percentText)percentText.textContent=`${percent}%`;if(fill)fill.style.width=`${percent}%`;window.scrollTo({top:0,behavior:'smooth'})};const validate=page=>{page.querySelectorAll('[data-required-checkbox-group]').forEach(group=>{const boxes=[...group.querySelectorAll('input[type=checkbox]')];if(boxes[0])boxes[0].setCustomValidity(boxes.some(box=>box.checked)?'':'Pertanyaan ini wajib diisi.')});const invalid=[...page.querySelectorAll('input,textarea,select')].find(control=>!control.checkValidity());if(invalid){invalid.reportValidity();return false}return true};form.querySelectorAll('[data-section-next]').forEach(button=>button.addEventListener('click',()=>{if(!validate(pages[current]))return;const page=pages[current];const target=page.dataset.navigationAction==='go_to_section'?Number(page.dataset.navigationTarget):current+1;if(!Number.isInteger(target)||!pages[target])return;history.push(current);show(target)}));form.querySelectorAll('[data-section-back]').forEach(button=>button.addEventListener('click',()=>{if(history.length)show(history.pop())}));form.addEventListener('reset',()=>setTimeout(()=>{history=[];show(0)}));form.addEventListener('submit',event=>{event.preventDefault();if(!validate(pages[current]))return;if(form.dataset.preview==='1'){if(window.FilamentNotification)new FilamentNotification().title('Preview berhasil. Jawaban tidak disimpan.').success().send();return}HTMLFormElement.prototype.submit.call(form)});show(Math.max(0,pages.findIndex(page=>page.querySelector('.hmif-respondent-error'))))});
 </script>

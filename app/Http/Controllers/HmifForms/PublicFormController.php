@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use App\Support\HmifFormFileUpload;
+use Illuminate\Validation\Rule;
 
 class PublicFormController extends Controller
 {
@@ -39,29 +40,48 @@ class PublicFormController extends Controller
     public function submit(Request $request, string $token): RedirectResponse
     {
         $form = $this->published($token);
-        abort_if($this->unavailableMessage($form), 422, $this->unavailableMessage($form));
+        if ($this->unavailableMessage($form)) {
+            return redirect()->route('hmif-forms.public.show', $token);
+        }
         if ($form->require_login && ! $request->user()) {
             return redirect()->guest('/admin/login');
         }
         $rules = $form->collect_email || $form->limit_one_response ? ['respondent_email' => [$request->user() ? 'nullable' : 'required', 'email', 'max:255']] : [];
+        $attributes = [];
         $respondentSectionIds = $this->respondentSectionIds($form);
         foreach ($form->questions as $question) {
             $isRequired = $question->is_required && $respondentSectionIds->contains($question->section_id);
+            $attributes["answers.{$question->id}"] = $question->label;
+            $attributes["answers.{$question->id}.*"] = $question->label;
             if ($question->type === 'file_upload') {
                 $settings = HmifFormFileUpload::normalize($question->settings);
                 $rules["answers.{$question->id}"] = [$isRequired ? 'required' : 'nullable', 'array', 'max:'.$settings['max_files']];
                 $rules["answers.{$question->id}.*"] = ['file', 'max:'.($settings['max_file_size_mb'] * 1024), 'mimetypes:'.implode(',', HmifFormFileUpload::allowedMimes($settings))];
             } else {
-                $rules["answers.{$question->id}"] = [$isRequired ? 'required' : 'nullable', $question->type === 'checkbox' ? 'array' : 'string'];
+                $options = $question->options->map(fn ($option) => $option->value ?: $option->label)->all();
+                $rules["answers.{$question->id}"] = [$isRequired ? 'required' : 'nullable', ...match ($question->type) {
+                    'checkbox' => ['array'],
+                    'radio', 'select' => ['string', Rule::in($options)],
+                    'email' => ['string', 'email', 'max:255'],
+                    'number' => ['numeric'],
+                    'date' => ['date'],
+                    'paragraph' => ['string', 'max:20000'],
+                    default => ['string', 'max:2000'],
+                }];
+                if ($question->type === 'checkbox') {
+                    $rules["answers.{$question->id}.*"] = ['string', Rule::in($options)];
+                }
             }
         }
-        $validated = $request->validate($rules);
+        $validated = $request->validate($rules, [], $attributes);
         $email = $request->user()?->email ?: ($validated['respondent_email'] ?? null);
         if ($form->limit_one_response) {
             $alreadySubmitted = $request->user()
                 ? $form->responses()->where('respondent_id', $request->user()->id)->exists()
                 : $form->responses()->where('respondent_email', $email)->exists();
-            abort_if($alreadySubmitted, 422, 'Anda sudah mengirim response untuk form ini.');
+            if ($alreadySubmitted) {
+                return back()->withInput()->withErrors(['form' => 'Anda sudah mengirim response untuk form ini.']);
+            }
         }
         $storedFiles = [];
         try {

@@ -1,30 +1,87 @@
 <x-filament-panels::page>
-    <div class="flex flex-wrap justify-between gap-4"><div><h2 class="text-xl font-bold text-gray-950 dark:text-white">{{ $form->title }}</h2><p class="text-gray-500"><strong>{{ number_format($form->responses_count) }}</strong> responses</p></div><x-filament::button color="gray" :href="\App\Filament\Pages\HmifFormBuilder::getUrl(['form'=>$form->uuid])">Questions</x-filament::button></div>
-    <x-filament::tabs><x-filament::tabs.item active>Summary</x-filament::tabs.item><x-filament::tabs.item tag="a" href="#question">Question</x-filament::tabs.item><x-filament::tabs.item tag="a" href="#individual">Individual</x-filament::tabs.item></x-filament::tabs>
-    <div id="question" class="grid gap-4 md:grid-cols-2">
-        @foreach($form->questions as $question)
-            <x-filament::section :heading="$question->label">
-                <p class="mb-3 text-sm text-gray-500">{{ $question->type==='file_upload' ? $question->responseFiles->count().' files' : $question->answers->count().' answers' }}</p>
-                @if($question->type==='file_upload')
-                    @foreach($question->responseFiles->take(5) as $file)<div class="flex items-center justify-between gap-3 border-b py-2 text-sm dark:border-white/10"><span>{{ $file->original_name }} · {{ number_format($file->size/1048576,2) }} MB</span><a class="text-primary-600" href="{{ route('hmif-forms.actions.response-files.download',$file) }}">Download</a></div>@endforeach
-                @elseif(in_array($question->type,['radio','checkbox','select']))
-                    @foreach($question->answers->groupBy('value')->sortByDesc(fn($answers)=>$answers->count()) as $value=>$answers)<div class="flex justify-between border-b py-2 text-sm dark:border-white/10"><span>{{ $value }}</span><strong>{{ $answers->count() }}</strong></div>@endforeach
-                @else
-                    @foreach($question->answers->take(5) as $answer)<p class="border-b py-2 text-sm dark:border-white/10">{{ $answer->value?:'—' }}</p>@endforeach
-                @endif
-            </x-filament::section>
-        @endforeach
+    <style>
+        .hmif-option-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.25rem .75rem;padding:.5rem 0;font-size:.875rem;color:rgb(55 65 81)}
+        .hmif-option-track{grid-column:1/-1;height:8px;overflow:hidden;border-radius:4px;background:rgb(243 244 246)}
+        .hmif-option-fill{display:block;height:100%;border-radius:4px;background:var(--primary-500)}
+        .hmif-option-count{font-variant-numeric:tabular-nums;color:rgb(17 24 39);font-weight:600}
+        .dark .hmif-option-row{color:rgb(209 213 219)}.dark .hmif-option-track{background:rgb(255 255 255/.08)}.dark .hmif-option-count{color:#fff}
+    </style>
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+            <h2 class="text-xl font-bold text-gray-950 dark:text-white">{{ $form->title }}</h2>
+            <p class="text-gray-500 dark:text-gray-400"><strong>{{ number_format($form->responses_count) }}</strong> responses</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <x-filament::button tag="a" color="gray" icon="heroicon-m-pencil-square" :href="\App\Filament\Pages\HmifFormBuilder::getUrl(['form' => $form->uuid])">Edit Form</x-filament::button>
+            @if ($form->responses_count > 0)
+                <x-filament::button tag="a" icon="heroicon-m-arrow-down-tray" :href="route('hmif-forms.actions.responses.export', $form)">Export CSV</x-filament::button>
+            @endif
+        </div>
     </div>
-    <div id="individual" class="space-y-4"><h2 class="text-lg font-semibold dark:text-white">Individual</h2>
-        @forelse($responses as $response)
-            <x-filament::section :heading="'Response #'.$response->id"><p class="mb-4 text-sm text-gray-500">{{ $response->submitted_at->format('d M Y H:i') }}</p>
-                @foreach($response->answers as $answer)<div class="mb-3"><strong class="text-sm dark:text-white">{{ $answer->question->label }}</strong>
-                    @if($answer->question->type==='file_upload')
-                        @forelse($response->files->where('question_id',$answer->question_id) as $file)<p class="text-sm"><a class="text-primary-600" href="{{ route('hmif-forms.actions.response-files.download',$file) }}">{{ $file->original_name }}</a> · {{ number_format($file->size/1048576,2) }} MB</p>@empty<p class="text-sm text-gray-500">—</p>@endforelse
-                    @else<p class="text-sm text-gray-600 dark:text-gray-300">{{ $answer->value?:'—' }}</p>@endif
-                </div>@endforeach
-            </x-filament::section>
-        @empty<p class="text-gray-500">Belum ada response.</p>@endforelse
+
+    <div class="space-y-6" x-data="{ tab: @js(request()->has('page') ? 'individual' : 'summary') }">
+        <x-filament::tabs>
+            <x-filament::tabs.item alpine-active="tab === 'summary'" x-on:click="tab = 'summary'">Summary</x-filament::tabs.item>
+            <x-filament::tabs.item alpine-active="tab === 'individual'" x-on:click="tab = 'individual'">Individual</x-filament::tabs.item>
+        </x-filament::tabs>
+
+        <div x-show="tab === 'summary'" class="grid gap-4 md:grid-cols-2">
+            @forelse ($summary as $item)
+                @php $question = $item['question']; @endphp
+                <x-filament::section :heading="$question->label">
+                    <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">{{ $question->type === 'file_upload' ? $question->responseFiles->count() . ' files' : $item['answered'] . ' answers' }}</p>
+                    @if ($question->type === 'file_upload')
+                        @foreach ($question->responseFiles->take(5) as $file)
+                            <div class="flex items-center justify-between gap-3 border-b border-gray-100 py-2 text-sm dark:border-white/10 dark:text-gray-300">
+                                <span class="min-w-0 truncate">{{ $file->original_name }} · {{ number_format($file->size / 1048576, 2) }} MB</span>
+                                <a class="text-primary-600 dark:text-primary-400" href="{{ route('hmif-forms.actions.response-files.download', $file) }}">Download</a>
+                            </div>
+                        @endforeach
+                    @elseif (in_array($question->type, ['radio', 'checkbox', 'select']))
+                        @foreach ($item['options'] as $option)
+                            @php $percent = $item['answered'] ? round($option['count'] / $item['answered'] * 100) : 0; @endphp
+                            <div class="hmif-option-row">
+                                <span class="min-w-0 truncate">{{ $option['label'] }}</span>
+                                <span class="hmif-option-count">{{ $option['count'] }} ({{ $percent }}%)</span>
+                                <span class="hmif-option-track"><span class="hmif-option-fill" style="width:{{ $percent }}%"></span></span>
+                            </div>
+                        @endforeach
+                    @else
+                        @forelse ($item['latest'] as $value)
+                            <p class="border-b border-gray-100 py-2 text-sm dark:border-white/10 dark:text-gray-300">{{ $value }}</p>
+                        @empty
+                            <p class="text-sm text-gray-500">Belum ada jawaban.</p>
+                        @endforelse
+                    @endif
+                </x-filament::section>
+            @empty
+                <p class="text-gray-500">Form ini belum punya pertanyaan.</p>
+            @endforelse
+        </div>
+
+        <div x-show="tab === 'individual'" x-cloak class="space-y-4">
+            @forelse ($responses as $response)
+                <x-filament::section :heading="'Response #' . $response->id">
+                    <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">{{ $response->submitted_at->format('d M Y H:i') }}@if ($response->respondent_email) · {{ $response->respondent_email }}@endif</p>
+                    @foreach ($response->answers->sortBy('question.sort_order') as $answer)
+                        <div class="mb-3">
+                            <strong class="text-sm dark:text-white">{{ $answer->question->label }}</strong>
+                            @if ($answer->question->type === 'file_upload')
+                                @forelse ($response->files->where('question_id', $answer->question_id) as $file)
+                                    <p class="text-sm dark:text-gray-300"><a class="text-primary-600 dark:text-primary-400" href="{{ route('hmif-forms.actions.response-files.download', $file) }}">{{ $file->original_name }}</a> · {{ number_format($file->size / 1048576, 2) }} MB</p>
+                                @empty
+                                    <p class="text-sm text-gray-500">—</p>
+                                @endforelse
+                            @else
+                                <p class="text-sm text-gray-600 dark:text-gray-300">{{ $answer->displayValue() ?: '—' }}</p>
+                            @endif
+                        </div>
+                    @endforeach
+                </x-filament::section>
+            @empty
+                <p class="text-gray-500">Belum ada response.</p>
+            @endforelse
+            {{ $responses->links() }}
+        </div>
     </div>
-    {{ $responses->links() }}
 </x-filament-panels::page>

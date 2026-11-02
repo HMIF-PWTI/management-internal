@@ -34,6 +34,7 @@ Route::middleware('auth')->prefix('admin/hmif-forms')->name('hmif-forms.actions.
     Route::put('/{form}/questions/{question}', [FormController::class, 'updateQuestion'])->name('questions.update');
     Route::post('/{form}/questions/{question}/duplicate', [FormController::class, 'duplicateQuestion'])->name('questions.duplicate');
     Route::delete('/{form}/questions/{question}', [FormController::class, 'deleteQuestion'])->name('questions.destroy');
+    Route::get('/{form}/responses/export', [FormController::class, 'exportResponses'])->name('responses.export');
     Route::post('/{form}/publish', [FormController::class, 'publish'])->name('publish');
     Route::post('/{form}/unpublish', [FormController::class, 'unpublish'])->name('unpublish');
     Route::post('/{form}/duplicate', [FormController::class, 'duplicate'])->name('duplicate');

@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FormController extends Controller
 {
@@ -73,6 +74,7 @@ class FormController extends Controller
             'questions.*.client_id' => ['required', 'string', 'max:100'],
             'questions.*.section_client_id' => ['required', 'string', 'max:100'],
             'questions.*.label' => ['required', 'string', 'max:1000'],
+            'questions.*.description' => ['nullable', 'string', 'max:2000'],
             'questions.*.type' => ['required', 'in:short_text,paragraph,email,number,date,radio,checkbox,select,file_upload'],
             'questions.*.required' => ['required', 'boolean'],
             'questions.*.settings' => ['nullable', 'array'],
@@ -85,7 +87,10 @@ class FormController extends Controller
             'questions.*.options.*.id' => ['nullable', 'integer'],
             'questions.*.options.*.client_id' => ['required', 'string', 'max:100'],
             'questions.*.options.*.label' => ['required', 'string', 'max:255'],
-        ])->after(function ($validator) use ($builder): void {
+        ])->after(function ($validator) use ($builder, $payload): void {
+            if (($payload['intent'] ?? null) === 'publish' && empty($builder['questions'])) {
+                $validator->errors()->add('questions', 'Tambahkan minimal satu pertanyaan sebelum publish.');
+            }
             if (filled(data_get($builder, 'settings.opens_at')) && filled(data_get($builder, 'settings.closes_at')) && \Illuminate\Support\Carbon::parse(data_get($builder, 'settings.closes_at'))->lte(\Illuminate\Support\Carbon::parse(data_get($builder, 'settings.opens_at')))) {
                 $validator->errors()->add('settings.closes_at', 'Waktu tutup harus setelah waktu buka.');
             }
@@ -119,7 +124,6 @@ class FormController extends Controller
                 $existingSections = $form->sections()->get()->keyBy('id');
                 $submittedSectionIds = collect($builder['sections'])->pluck('id')->filter()->map(fn ($id) => (int) $id);
                 abort_if($submittedSectionIds->diff($existingSections->keys())->isNotEmpty(), 422, 'Section tidak valid.');
-                $form->sections()->whereNotIn('id', $submittedSectionIds)->delete();
 
                 $sectionsByClientId = collect();
                 foreach ($builder['sections'] as $sectionPosition => $sectionData) {
@@ -186,7 +190,7 @@ class FormController extends Controller
                         'section_id' => $sectionsByClientId->get($questionData['section_client_id'])?->id,
                         'type' => $questionData['type'],
                         'label' => $questionData['label'],
-                        'description' => null,
+                        'description' => $questionData['description'] ?? null,
                         'settings' => $questionData['type'] === 'file_upload' ? HmifFormFileUpload::normalize($questionData['settings']) : null,
                         'is_required' => $questionData['required'],
                         'sort_order' => $position,
@@ -216,6 +220,10 @@ class FormController extends Controller
                         $record->save();
                     }
                 }
+
+                // Runs after the question loop: the FK cascades, so a question moved out of a
+                // removed section would otherwise be deleted before its new section is saved.
+                $form->sections()->whereNotIn('id', $sectionsByClientId->pluck('id'))->delete();
 
                 if (($payload['intent'] ?? 'save') === 'publish') {
                     $form->update([
@@ -389,7 +397,7 @@ class FormController extends Controller
         $returnTo = $request->validate(['return_to' => ['nullable', 'in:dashboard']])['return_to'] ?? null;
         $source = $this->owned($request, $form)->load(['sections', 'questions.options']);
         $copy = DB::transaction(function () use ($request, $source) {
-            $copy = $request->user()->hmifForms()->create(['title' => $source->title.' (Copy)', 'description' => $source->description, 'status' => 'draft', 'require_login' => $source->require_login, 'theme_settings' => $source->theme_settings]);
+            $copy = $request->user()->hmifForms()->create(['title' => $source->title.' (Copy)', 'description' => $source->description, 'status' => 'draft', ...$source->only(['require_login', 'collect_email', 'limit_one_response', 'show_progress_bar', 'shuffle_questions', 'required_by_default', 'confirmation_message', 'theme_settings'])]);
             $sectionMap = [];
             foreach ($source->sections as $section) {
                 $sectionMap[$section->id] = $copy->sections()->create($section->only(['title', 'description', 'position', 'after_section_action']))->id;
@@ -413,6 +421,35 @@ class FormController extends Controller
         return $returnTo === 'dashboard'
             ? back()
             : redirect(HmifFormBuilder::getUrl(['form' => $copy->uuid]));
+    }
+
+    public function exportResponses(Request $request, HmifForm $form): StreamedResponse
+    {
+        $form = $this->owned($request, $form);
+        $questions = $form->questions()->get();
+        // Respondents are public, so a leading = + - @ must not run as a spreadsheet formula.
+        $cell = fn (?string $value): string => preg_match('/^[=+\-@\t\r]/', (string) $value) ? "'".$value : (string) $value;
+
+        return response()->streamDownload(function () use ($form, $questions, $cell): void {
+            $output = fopen('php://output', 'w');
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, ['Waktu', 'Email', ...$questions->pluck('label')->map($cell)]);
+
+            foreach ($form->responses()->with(['answers.question', 'files'])->oldest('submitted_at')->cursor() as $response) {
+                $answers = $response->answers->keyBy('question_id');
+                $files = $response->files->groupBy('question_id');
+
+                fputcsv($output, [
+                    $response->submitted_at->format('Y-m-d H:i:s'),
+                    $cell($response->respondent_email),
+                    ...$questions->map(fn ($question) => $cell($question->type === 'file_upload'
+                        ? $files->get($question->id)?->pluck('original_name')->implode(', ')
+                        : $answers->get($question->id)?->displayValue())),
+                ]);
+            }
+
+            fclose($output);
+        }, Str::slug($form->title).'-responses.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function destroy(Request $request, HmifForm $form): RedirectResponse
