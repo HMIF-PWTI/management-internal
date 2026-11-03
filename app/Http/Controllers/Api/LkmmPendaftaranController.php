@@ -73,6 +73,8 @@ class LkmmPendaftaranController extends Controller
 
         // Cek pendaftaran dengan NIM yang sama
         $existing = LkmmPendaftaran::where('nim', $nim)->latest()->first();
+
+        // Jika sudah terdaftar dan status BUKAN ditolak (pending atau diterima), tolak duplikasi
         if ($existing && $existing->status !== 'ditolak') {
             return response()->json([
                 'success' => false,
@@ -81,15 +83,58 @@ class LkmmPendaftaranController extends Controller
             ], 409);
         }
 
+        $storagePath = "lkmm-berkas/{$nim}";
+        $storedFiles = [];
+
+        // JIKA STATUS SEBELUMNYA 'DITOLAK':
+        // Update (edit) record yang sudah ada, jangan buat baris baru agar NIM tetap unik
+        if ($existing && $existing->status === 'ditolak') {
+            // Hapus file fisik lama di storage yang diganti dengan file baru
+            foreach (LkmmPendaftaran::fileFields() as $field) {
+                if ($request->hasFile($field)) {
+                    if ($existing->$field && Storage::disk('public')->exists($existing->$field)) {
+                        Storage::disk('public')->delete($existing->$field);
+                    }
+                    $storedFiles[$field] = $request->file($field)->store($storagePath, 'public');
+                }
+            }
+
+            // Update record data pendaftar dan kembalikan status ke 'pending'
+            $existing->update([
+                'nama_lengkap' => $request->input('nama_lengkap'),
+                'angkatan'     => $request->input('angkatan'),
+                'kelas'        => $request->input('kelas'),
+                'ipk'          => $request->input('ipk'),
+                'no_wa'        => $request->input('no_wa'),
+                'email'        => $request->input('email'),
+                'status'       => 'pending',
+                'catatan'      => 'Berkas perbaikan telah dikirim ulang oleh peserta pada ' . now()->format('d M Y, H:i') . '. (Catatan revisi panitia sebelumnya: ' . ($existing->catatan ?? '-') . ')',
+                ...$storedFiles,
+            ]);
+
+            return response()->json([
+                'success'          => true,
+                'is_update'        => true,
+                'message'          => 'Perbaikan berkas pendaftaran berhasil dikirim! Status telah dikembalikan ke antrean verifikasi panitia.',
+                'nomor_registrasi' => $existing->nomor_registrasi,
+                'data'             => [
+                    'nomor_registrasi' => $existing->nomor_registrasi,
+                    'nama_lengkap'     => $existing->nama_lengkap,
+                    'nim'              => $existing->nim,
+                    'angkatan'         => $existing->angkatan,
+                    'kelas'            => $existing->kelas,
+                    'email'            => $existing->email,
+                    'status'           => $existing->status,
+                ],
+            ], 200);
+        }
+
+        // JIKA PENDAFTARAN BARU:
         // Generate Nomor Registrasi Unik
         $nomorRegistrasi = 'LKMM-2026-' . $nim . '-' . rand(1000, 9999);
         while (LkmmPendaftaran::where('nomor_registrasi', $nomorRegistrasi)->exists()) {
             $nomorRegistrasi = 'LKMM-2026-' . $nim . '-' . rand(1000, 9999);
         }
-
-        // Simpan File ke Storage Public
-        $storagePath = "lkmm-berkas/{$nim}";
-        $storedFiles = [];
 
         foreach (LkmmPendaftaran::fileFields() as $field) {
             if ($request->hasFile($field)) {
@@ -113,6 +158,7 @@ class LkmmPendaftaranController extends Controller
 
         return response()->json([
             'success'          => true,
+            'is_update'        => false,
             'message'          => 'Pendaftaran LKMM berhasil! Harap simpan Nomor Registrasi Anda.',
             'nomor_registrasi' => $nomorRegistrasi,
             'data'             => [
