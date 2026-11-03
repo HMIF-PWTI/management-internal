@@ -225,15 +225,6 @@ DB_PASSWORD=<password-acak>
 MYSQL_ROOT_PASSWORD=<password-root-acak>
 ```
 
-Simpan credential Firebase di server pada
-`storage/app/firebase/firebase-service-account.json`. File JSON ini sengaja
-tidak disimpan di Git dan dipasang ke container sebagai Docker secret. Jika
-lokasinya berbeda, set path host-nya di `.env`:
-
-```dotenv
-FIREBASE_CREDENTIALS_HOST_PATH=/path/aman/firebase-service-account.json
-```
-
 Validasi dan jalankan seluruh stack:
 
 ```bash
