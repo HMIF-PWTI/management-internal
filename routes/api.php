@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\IfPediaController;
 use App\Http\Controllers\Api\InfoKpController;
 use App\Http\Controllers\Api\KegiatanController;
 use App\Http\Controllers\Api\LapakKwuController;
+use App\Http\Controllers\Api\LkmmPendaftaranController;
 use App\Http\Controllers\Api\RfidScanController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,4 +32,10 @@ Route::prefix('v1')->group(function () {
 
 Route::prefix('v1')->group(function () {
     Route::get('/info-kps', [InfoKpController::class, 'index']);
+});
+
+// LKMM Pendaftaran - Public endpoints (no auth required)
+Route::prefix('lkmm')->group(function () {
+    Route::post('/daftar', [LkmmPendaftaranController::class, 'store']);
+    Route::get('/status', [LkmmPendaftaranController::class, 'checkStatus']);
 });
