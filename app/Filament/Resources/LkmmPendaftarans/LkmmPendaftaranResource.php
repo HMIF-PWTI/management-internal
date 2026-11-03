@@ -24,7 +24,7 @@ class LkmmPendaftaranResource extends Resource
 
     protected static ?string $modelLabel = 'Pendaftar LKMM';
 
-    protected static ?string $navigationGroup = 'LKMM';
+    protected static string|\UnitEnum|null $navigationGroup = 'LKMM';
 
     protected static ?int $navigationSort = 20;
 

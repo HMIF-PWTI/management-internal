@@ -6,12 +6,12 @@ use App\Filament\Resources\LkmmPendaftarans\LkmmPendaftaranResource;
 use App\Models\LkmmPendaftaran;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
-use Filament\Infolists\Components\Grid;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
@@ -20,9 +20,9 @@ class ViewLkmmPendaftaran extends ViewRecord
 {
     protected static string $resource = LkmmPendaftaranResource::class;
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
+        return $schema->components([
             Section::make('Informasi Pendaftaran')
                 ->schema([
                     Grid::make(3)->schema([
