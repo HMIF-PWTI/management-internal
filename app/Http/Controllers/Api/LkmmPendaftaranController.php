@@ -15,6 +15,27 @@ class LkmmPendaftaranController extends Controller
      */
     public function store(Request $request)
     {
+        $nim = trim((string) $request->input('nim'));
+
+        // Cek pendaftaran dengan NIM yang sama
+        $existing = !empty($nim) ? LkmmPendaftaran::where('nim', $nim)->latest()->first() : null;
+
+        // Jika sudah terdaftar dan status BUKAN ditolak (pending atau diterima), tolak duplikasi
+        if ($existing && $existing->status !== 'ditolak') {
+            return response()->json([
+                'success' => false,
+                'message' => "NIM {$nim} sudah terdaftar sebelumnya dengan Nomor Registrasi: {$existing->nomor_registrasi} (Status: {$existing->status}). Anda tidak perlu mendaftar ulang agar tidak terjadi data ganda.",
+                'nomor_registrasi' => $existing->nomor_registrasi,
+            ], 409);
+        }
+
+        // Tentukan apakah ini pengiriman baru atau perbaikan berkas yang ditolak
+        $isResubmission = ($existing && $existing->status === 'ditolak');
+
+        // Jika perbaikan berkas, file bersifat opsional (hanya diunggah jika ingin mengganti berkas lama)
+        $docRule = $isResubmission ? 'nullable|file|mimes:pdf,doc,docx|max:10240' : 'required|file|mimes:pdf,doc,docx|max:10240';
+        $docImgRule = $isResubmission ? 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' : 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240';
+
         $validator = Validator::make($request->all(), [
             'nama_lengkap'    => 'required|string|max:255',
             'nim'             => 'required|string|max:20',
@@ -24,13 +45,13 @@ class LkmmPendaftaranController extends Controller
             'no_wa'           => 'required|string|max:20',
             'email'           => 'required|email|max:255',
             // Setiap file dibatasi maksimal 10 MB (10240 KB)
-            'file_formulir'   => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'file_pernyataan' => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'file_izin_ortu'  => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'file_cv'         => 'required|file|mimes:pdf,doc,docx|max:10240',
-            'file_surat_aktif'=> 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'file_kulber'     => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
-            'file_transkrip'  => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'file_formulir'   => $docRule,
+            'file_pernyataan' => $docRule,
+            'file_izin_ortu'  => $docRule,
+            'file_cv'         => $docRule,
+            'file_surat_aktif'=> $docImgRule,
+            'file_kulber'     => $docImgRule,
+            'file_transkrip'  => $docImgRule,
         ], [
             'nama_lengkap.required'     => 'Nama lengkap wajib diisi.',
             'nim.required'              => 'NIM wajib diisi.',
@@ -69,26 +90,12 @@ class LkmmPendaftaranController extends Controller
             ], 422);
         }
 
-        $nim = trim($request->input('nim'));
-
-        // Cek pendaftaran dengan NIM yang sama
-        $existing = LkmmPendaftaran::where('nim', $nim)->latest()->first();
-
-        // Jika sudah terdaftar dan status BUKAN ditolak (pending atau diterima), tolak duplikasi
-        if ($existing && $existing->status !== 'ditolak') {
-            return response()->json([
-                'success' => false,
-                'message' => "NIM {$nim} sudah terdaftar sebelumnya dengan Nomor Registrasi: {$existing->nomor_registrasi} (Status: {$existing->status}). Jika membutuhkan perbaikan berkas, silakan hubungi narahubung panitia.",
-                'nomor_registrasi' => $existing->nomor_registrasi,
-            ], 409);
-        }
-
         $storagePath = "lkmm-berkas/{$nim}";
         $storedFiles = [];
 
         // JIKA STATUS SEBELUMNYA 'DITOLAK':
-        // Update (edit) record yang sudah ada, jangan buat baris baru agar NIM tetap unik
-        if ($existing && $existing->status === 'ditolak') {
+        // Update (edit) record yang sudah ada, jangan buat baris baru agar NIM tetap unik & tidak dobel
+        if ($isResubmission) {
             // Hapus file fisik lama di storage yang diganti dengan file baru
             foreach (LkmmPendaftaran::fileFields() as $field) {
                 if ($request->hasFile($field)) {
@@ -115,7 +122,7 @@ class LkmmPendaftaranController extends Controller
             return response()->json([
                 'success'          => true,
                 'is_update'        => true,
-                'message'          => 'Perbaikan berkas pendaftaran berhasil dikirim! Status telah dikembalikan ke antrean verifikasi panitia.',
+                'message'          => 'Perbaikan berkas pendaftaran berhasil disimpan! Data telah diperbarui dan dikembalikan ke antrean verifikasi panitia (tanpa duplikasi data).',
                 'nomor_registrasi' => $existing->nomor_registrasi,
                 'data'             => [
                     'nomor_registrasi' => $existing->nomor_registrasi,
@@ -207,9 +214,21 @@ class LkmmPendaftaranController extends Controller
                 'nim'              => $pendaftaran->nim,
                 'angkatan'         => $pendaftaran->angkatan,
                 'kelas'            => $pendaftaran->kelas,
+                'ipk'              => (string) $pendaftaran->ipk,
+                'no_wa'            => $pendaftaran->no_wa,
+                'email'            => $pendaftaran->email,
                 'status'           => $pendaftaran->status,
                 'catatan'          => $pendaftaran->catatan,
                 'created_at'       => $pendaftaran->created_at ? $pendaftaran->created_at->format('d M Y, H:i') : null,
+                'existing_files'   => [
+                    'formulir'   => !empty($pendaftaran->file_formulir),
+                    'pernyataan' => !empty($pendaftaran->file_pernyataan),
+                    'izinOrtu'   => !empty($pendaftaran->file_izin_ortu),
+                    'cv'         => !empty($pendaftaran->file_cv),
+                    'suratAktif' => !empty($pendaftaran->file_surat_aktif),
+                    'kulber'     => !empty($pendaftaran->file_kulber),
+                    'transkrip'  => !empty($pendaftaran->file_transkrip),
+                ],
             ],
         ]);
     }

@@ -5,7 +5,9 @@ namespace App\Filament\Resources\LkmmPendaftarans\Pages;
 use App\Filament\Resources\LkmmPendaftarans\LkmmPendaftaranResource;
 use App\Models\LkmmPendaftaran;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -211,6 +213,34 @@ class ViewLkmmPendaftaran extends ViewRecord
                     $this->refreshFormData(['status', 'catatan']);
                 })
                 ->visible(fn () => $this->record->status !== 'ditolak'),
+
+            Action::make('edit_data')
+                ->label('Edit Data Peserta')
+                ->icon('heroicon-o-pencil')
+                ->color('info')
+                ->fillForm(fn () => [
+                    'nama_lengkap' => $this->record->nama_lengkap,
+                    'nim'          => $this->record->nim,
+                    'angkatan'     => $this->record->angkatan,
+                    'kelas'        => $this->record->kelas,
+                    'ipk'          => $this->record->ipk,
+                    'no_wa'        => $this->record->no_wa,
+                    'email'        => $this->record->email,
+                ])
+                ->form([
+                    TextInput::make('nama_lengkap')->label('Nama Lengkap')->required(),
+                    TextInput::make('nim')->label('NIM')->required(),
+                    Select::make('angkatan')->label('Angkatan')->options(['2024' => '2024', '2025' => '2025'])->required(),
+                    TextInput::make('kelas')->label('Kelas')->required(),
+                    TextInput::make('ipk')->label('IPK Berjalan')->numeric()->required(),
+                    TextInput::make('no_wa')->label('Nomor WhatsApp')->required(),
+                    TextInput::make('email')->label('Email Aktif')->email()->required(),
+                ])
+                ->action(function (array $data) {
+                    $this->record->update($data);
+                    Notification::make()->title('Data pendaftar berhasil diperbarui!')->success()->send();
+                    $this->refreshFormData(['nama_lengkap', 'nim', 'angkatan', 'kelas', 'ipk', 'no_wa', 'email']);
+                }),
 
             Action::make('edit_catatan')
                 ->label('Ubah Catatan')
